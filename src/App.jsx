@@ -325,10 +325,13 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
     gameOver: false,
     started: false,
     beatPhase: 0,
+    lives: 3,
+    invincible: 0,
     highScore: parseInt(localStorage.getItem('obby_high') || '0'),
   });
   const [displayScore, setDisplayScore] = useState(0);
   const [displayCoins, setDisplayCoins] = useState(0);
+  const [displayLives, setDisplayLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
   const animRef = useRef(null);
@@ -409,6 +412,9 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
         g.coins.forEach(c => { c.x -= g.speed; });
         g.coins = g.coins.filter(c => c.x + c.w > -20 && !c.collected);
 
+        // Tick down invincibility frames
+        if (g.invincible > 0) g.invincible--;
+
         // Collision (player hitbox is smaller than visual)
         const px = g.player.x + 6, py = g.player.y + 4, pw = 28, ph = 36;
         for (const o of g.obstacles) {
@@ -434,32 +440,54 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
               }
               continue;
             }
-            // Side/bottom hit — game over
-            g.gameOver = true;
-            setGameOver(true);
-            // Spawn crash particles
-            for (let i = 0; i < 12; i++) {
+            // Side/bottom hit — lose a life (if not invincible)
+            if (g.invincible > 0) continue;
+            g.lives--;
+            setDisplayLives(g.lives);
+            // Hit particles (smaller burst than death)
+            for (let i = 0; i < 8; i++) {
               g.particles.push({
                 x: g.player.x + 20, y: g.player.y + 20,
-                vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
-                life: 30 + Math.random() * 20,
-                color: ['#FF6B6B', '#FDCB6E', '#6C5CE7', '#FD79A8'][Math.floor(Math.random() * 4)],
-                size: 4 + Math.random() * 6,
+                vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6,
+                life: 20 + Math.random() * 10,
+                color: ['#FF6B6B', '#FDCB6E', '#FD79A8'][Math.floor(Math.random() * 3)],
+                size: 3 + Math.random() * 4,
               });
             }
-            if (g.score > g.highScore) {
-              g.highScore = g.score;
-              localStorage.setItem('obby_high', g.score.toString());
+            if (g.lives <= 0) {
+              // Final death — game over
+              g.gameOver = true;
+              setGameOver(true);
+              // Big crash particles
+              for (let i = 0; i < 12; i++) {
+                g.particles.push({
+                  x: g.player.x + 20, y: g.player.y + 20,
+                  vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+                  life: 30 + Math.random() * 20,
+                  color: ['#FF6B6B', '#FDCB6E', '#6C5CE7', '#FD79A8'][Math.floor(Math.random() * 4)],
+                  size: 4 + Math.random() * 6,
+                });
+              }
+              if (g.score > g.highScore) {
+                g.highScore = g.score;
+                localStorage.setItem('obby_high', g.score.toString());
+              }
+              const earned = g.coinsCollected;
+              if (earned > 0) setCoins(c => c + earned);
+            } else {
+              // Still alive — brief invincibility (90 frames = 1.5 sec) + bounce up
+              g.invincible = 90;
+              g.player.vy = JUMP_FORCE * 0.7;
+              g.player.grounded = false;
             }
-            const earned = g.coinsCollected;
-            if (earned > 0) setCoins(c => c + earned);
             break;
           }
         }
 
-        // Coin collection
+        // Coin collection (generous radius — easier to grab)
+        const coinPad = 12;
         for (const c of g.coins) {
-          if (!c.collected && px < c.x + c.w && px + pw > c.x && py < c.y + c.h && py + ph > c.y) {
+          if (!c.collected && px < c.x + c.w + coinPad && px + pw > c.x - coinPad && py < c.y + c.h + coinPad && py + ph > c.y - coinPad) {
             c.collected = true;
             g.coinsCollected++;
             // Sparkle
@@ -550,7 +578,9 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
         ctx.fillText('¢', c.x + 8, c.y + 12 + bounce);
       });
 
-      // Player (blocky avatar)
+      // Player (blocky avatar) — flash when invincible
+      const showPlayer = g.invincible <= 0 || Math.floor(g.frame / 4) % 2 === 0;
+      if (showPlayer) {
       const py = g.player.y;
       const px2 = g.player.x;
       const squash = g.player.jumping ? 0.85 : (g.player.grounded && g.player.vy === 0 ? 1 + Math.sin(g.frame * 0.15) * 0.03 : 1);
@@ -610,6 +640,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
         ctx.fillRect(px2 + 10, py - 16, 20, 16);
       }
       ctx.restore();
+      } // end showPlayer (invincibility flash)
 
       // Particles
       g.particles.forEach(p => {
@@ -621,13 +652,17 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
 
       // HUD
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.fillRect(8, 8, 140, 28);
+      ctx.fillRect(8, 8, 200, 28);
       ctx.fillStyle = 'white';
       ctx.font = "bold 13px 'Fredoka One', sans-serif";
       ctx.textAlign = 'left';
       ctx.fillText(`Score: ${g.score}`, 16, 26);
       ctx.fillStyle = '#FFD700';
       ctx.fillText(`🪙 ${g.coinsCollected}`, 100, 26);
+      // Lives display
+      ctx.fillStyle = '#FF6B6B';
+      const heartsStr = '❤️'.repeat(g.lives) + '🖤'.repeat(Math.max(0, 3 - g.lives));
+      ctx.fillText(heartsStr, 150, 26);
 
       if (g.score > 0 && g.highScore > 0) {
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
@@ -687,8 +722,9 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
       g.obstacles = []; g.particles = []; g.coins = [];
       g.score = 0; g.coinsCollected = 0; g.speed = 3.5;
       g.frame = 0; g.gameOver = false; g.started = true;
+      g.lives = 3; g.invincible = 0;
       setGameOver(false); setStarted(true);
-      setDisplayScore(0); setDisplayCoins(0);
+      setDisplayScore(0); setDisplayCoins(0); setDisplayLives(3);
     } else {
       jump();
     }

@@ -1087,6 +1087,25 @@ export default function BlockVerse() {
     skinColor: '#FDBCB4', shirtColor: '#6C5CE7',
     pantsColor: '#2D3436', hatId: 'cap', accessoryId: 'none',
   });
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const musicRef = useRef(null);
+
+  // Background music
+  useEffect(() => {
+    const audio = new Audio('/pixel-dreams.mp3');
+    audio.loop = true;
+    audio.volume = 0.3;
+    musicRef.current = audio;
+    return () => { audio.pause(); audio.src = ''; };
+  }, []);
+
+  const toggleMusic = () => {
+    const audio = musicRef.current;
+    if (!audio) return;
+    if (musicPlaying) { audio.pause(); }
+    else { audio.play().catch(() => {}); }
+    setMusicPlaying(!musicPlaying);
+  };
 
   // Auto-save on changes
   useEffect(() => { writeSave(coins, owned, avatar); }, [coins, owned, avatar]);
@@ -1114,7 +1133,10 @@ export default function BlockVerse() {
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 24px',background:'rgba(255,255,255,0.08)',backdropFilter:'blur(14px)',borderBottom:'1.5px solid rgba(255,255,255,0.15)',position:'relative',zIndex:10}}>
           <MusicBars count={7} color="rgba(255,255,255,0.7)" height={32}/>
           <div style={{fontFamily:"'Fredoka One',cursive",fontSize:32,background:'linear-gradient(90deg,#fff,#FD79A8,#FDCB6E,#00CEC9,#fff)',backgroundSize:'200% auto',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',animation:'logoShimmer 4s linear infinite',letterSpacing:1}}>🎵 BlockVerse 🧱</div>
-          <div style={{background:'linear-gradient(135deg,#FFD700,#FF8C00)',color:'white',borderRadius:50,padding:'9px 20px',fontFamily:"'Fredoka One',cursive",fontSize:17,display:'flex',alignItems:'center',gap:7,boxShadow:'0 4px 18px rgba(255,140,0,0.45)',animation:'coinPulse 2.5s ease-in-out infinite'}}>🪙 {coins.toLocaleString()}</div>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <button onClick={toggleMusic} title={musicPlaying ? 'Pause music' : 'Play music'} style={{background:musicPlaying?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.08)',border:'2px solid rgba(255,255,255,0.25)',borderRadius:'50%',width:40,height:40,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:18,transition:'all 0.2s',backdropFilter:'blur(8px)'}}>{musicPlaying ? '🔊' : '🔇'}</button>
+            <div style={{background:'linear-gradient(135deg,#FFD700,#FF8C00)',color:'white',borderRadius:50,padding:'9px 20px',fontFamily:"'Fredoka One',cursive",fontSize:17,display:'flex',alignItems:'center',gap:7,boxShadow:'0 4px 18px rgba(255,140,0,0.45)',animation:'coinPulse 2.5s ease-in-out infinite'}}>🪙 {coins.toLocaleString()}</div>
+          </div>
         </div>
         <div style={{maxWidth:960,margin:'0 auto',padding:'28px 18px',position:'relative',zIndex:5}}>
           <div style={{background:'rgba(255,255,255,0.96)',borderRadius:28,padding:28,marginBottom:28,display:'flex',alignItems:'center',gap:24,flexWrap:'wrap',boxShadow:'0 12px 40px rgba(0,0,0,0.25)',animation:'slideUp 0.6s ease both'}}>

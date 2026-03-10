@@ -378,6 +378,10 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
       if (Math.random() > 0.4) {
         g.coins.push({ x: CANVAS_W + 20 + t.w / 2 - 8, y: GROUND_Y + 30 - t.h - 40, w: 16, h: 16, collected: false });
       }
+      // Rare heart pickup (~8% chance, only if missing lives)
+      if (g.lives < 3 && Math.random() < 0.08) {
+        g.coins.push({ x: CANVAS_W + 60 + Math.random() * 40, y: GROUND_Y + 30 - t.h - 65, w: 18, h: 18, collected: false, isHeart: true });
+      }
     };
 
     const loop = () => {
@@ -484,19 +488,32 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
           }
         }
 
-        // Coin collection (generous radius — easier to grab)
+        // Coin & heart collection (generous radius — easier to grab)
         const coinPad = 12;
         for (const c of g.coins) {
           if (!c.collected && px < c.x + c.w + coinPad && px + pw > c.x - coinPad && py < c.y + c.h + coinPad && py + ph > c.y - coinPad) {
             c.collected = true;
-            g.coinsCollected++;
-            // Sparkle
-            for (let i = 0; i < 6; i++) {
-              g.particles.push({
-                x: c.x + 8, y: c.y + 8,
-                vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
-                life: 20, color: '#FFD700', size: 3 + Math.random() * 3,
-              });
+            if (c.isHeart) {
+              // Heart pickup — restore a life
+              g.lives = Math.min(3, g.lives + 1);
+              setDisplayLives(g.lives);
+              for (let i = 0; i < 8; i++) {
+                g.particles.push({
+                  x: c.x + 9, y: c.y + 9,
+                  vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
+                  life: 25, color: ['#FF6B6B', '#FF4757', '#FF69B4'][Math.floor(Math.random() * 3)], size: 3 + Math.random() * 4,
+                });
+              }
+            } else {
+              g.coinsCollected++;
+              // Sparkle
+              for (let i = 0; i < 6; i++) {
+                g.particles.push({
+                  x: c.x + 8, y: c.y + 8,
+                  vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
+                  life: 20, color: '#FFD700', size: 3 + Math.random() * 3,
+                });
+              }
             }
           }
         }
@@ -561,21 +578,35 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
         ctx.strokeRect(o.x, o.y, o.w, o.h);
       });
 
-      // Coins
+      // Coins & Hearts
       g.coins.filter(c => !c.collected).forEach(c => {
         const bounce = Math.sin(g.frame * 0.1 + c.x) * 3;
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath();
-        ctx.arc(c.x + 8, c.y + 8 + bounce, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#FFA500';
-        ctx.beginPath();
-        ctx.arc(c.x + 8, c.y + 8 + bounce, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#FFD700';
-        ctx.font = 'bold 10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('¢', c.x + 8, c.y + 12 + bounce);
+        if (c.isHeart) {
+          // Heart pickup — pulsing red heart
+          const pulse = 1 + Math.sin(g.frame * 0.15) * 0.15;
+          ctx.save();
+          ctx.translate(c.x + 9, c.y + 9 + bounce);
+          ctx.scale(pulse, pulse);
+          ctx.fillStyle = '#FF4757';
+          ctx.font = 'bold 18px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('❤️', 0, 0);
+          ctx.restore();
+        } else {
+          ctx.fillStyle = '#FFD700';
+          ctx.beginPath();
+          ctx.arc(c.x + 8, c.y + 8 + bounce, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FFA500';
+          ctx.beginPath();
+          ctx.arc(c.x + 8, c.y + 8 + bounce, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FFD700';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('¢', c.x + 8, c.y + 12 + bounce);
+        }
       });
 
       // Player (blocky avatar) — flash when invincible

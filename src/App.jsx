@@ -18,7 +18,7 @@ import {
 } from './utils/constants.js';
 
 export default function BlockVerse() {
-  const save = useRef(loadSave()).current;
+  const [save] = useState(() => loadSave());
   const [screen, setScreen] = useState('lobby');
   const [coins, setCoins] = useState(save?.coins ?? STARTING_COINS);
   const [xp, setXp] = useState(save?.xp ?? 0);
@@ -64,9 +64,12 @@ export default function BlockVerse() {
     setMusicPlaying(!musicPlaying);
   };
 
-  // Auto-save on changes
+  // Auto-save on changes (debounced)
   useEffect(() => {
-    writeSave(coins, owned, avatar, xp, lastLoginRef.current);
+    const id = setTimeout(() => {
+      writeSave(coins, owned, avatar, xp, lastLoginRef.current);
+    }, 500);
+    return () => clearTimeout(id);
   }, [coins, owned, avatar, xp]);
 
   // Route to screens

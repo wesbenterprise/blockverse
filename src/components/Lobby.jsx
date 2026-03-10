@@ -2,10 +2,8 @@ import AvatarSVG from './AvatarSVG.jsx';
 import MusicBars from './MusicBars.jsx';
 import FloatingParticles from './FloatingParticles.jsx';
 import GameCard from './GameCard.jsx';
-import { GAMES } from '../utils/constants.js';
+import { GAMES, PLAYABLE_GAME_IDS } from '../utils/constants.js';
 import { getLevel, getLevelTitle, getLevelProgress, getNextLevelXp } from '../utils/levels.js';
-
-const PLAYABLE_GAME_IDS = ['obby', 'sandbox', 'mining'];
 
 export default function Lobby({ avatar, coins, xp, onNavigate, onToggleMusic, musicPlaying, dailyToast, levelUpToast }) {
   const level = getLevel(xp);
@@ -13,16 +11,6 @@ export default function Lobby({ avatar, coins, xp, onNavigate, onToggleMusic, mu
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap');
-        * { box-sizing:border-box; margin:0; padding:0; }
-        @keyframes floatNote { 0%,100%{transform:translateY(0) rotate(-8deg);opacity:0.2;}50%{transform:translateY(-22px) rotate(8deg);opacity:0.45;} }
-        @keyframes musicBar { from{height:8px;}to{height:var(--maxH);} }
-        @keyframes coinPulse { 0%,100%{transform:scale(1);}50%{transform:scale(1.07);} }
-        @keyframes logoShimmer { 0%{background-position:0% center;}100%{background-position:200% center;} }
-        @keyframes notesBounce { 0%,100%{transform:translateY(0) rotate(-5deg);}50%{transform:translateY(-10px) rotate(5deg);} }
-        @keyframes slideUp { from{opacity:0;transform:translateY(30px);}to{opacity:1;transform:translateY(0);} }
-      `}</style>
       <div style={{
         minHeight: '100vh',
         background: 'linear-gradient(160deg,#1a0533 0%,#2D1B69 40%,#6C5CE7 80%,#FD79A8 100%)',

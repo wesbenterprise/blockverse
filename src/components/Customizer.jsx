@@ -119,7 +119,6 @@ export default function Customizer({ av, setAv, coins, setCoins, onBack, owned, 
       fontFamily: 'Nunito,sans-serif',
       position: 'relative',
     }}>
-      <style>{`@keyframes custShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(6px)} 75%{transform:translateX(-4px)} }`}</style>
       <FloatingParticles />
 
       {cantAfford && (

@@ -149,6 +149,7 @@ export const LEVEL_UP_COIN_MULTIPLIER = 10;
 export const STARTING_COINS = 350;
 export const SAVE_KEY = 'blockverse_save';
 export const TOAST_DURATION_MS = 3000;
+export const PLAYABLE_GAME_IDS = ['obby', 'sandbox', 'mining'];
 export const COIN_TOAST_DURATION_MS = 2500;
 
 // ─── CRYSTAL MINE CONSTANTS ──────────────────────────────────────────────────

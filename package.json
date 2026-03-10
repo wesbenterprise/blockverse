@@ -1,0 +1,19 @@
+{
+  "name": "blockverse",
+  "version": "1.0.0",
+  "description": "BlockVerse - A musical Minecraft/Roblox-style game",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.4",
+    "vite": "^7.3.1"
+  }
+}

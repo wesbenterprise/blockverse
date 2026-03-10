@@ -1,0 +1,242 @@
+import { MUSIC } from './constants.js';
+
+// ─── SHARED AUDIO CONTEXT ─────────────────────────────────────────────────────
+// Browsers limit concurrent AudioContexts. We create ONE and share it app-wide.
+let sharedAudioCtx = null;
+
+export function getSharedAudioCtx() {
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return sharedAudioCtx;
+}
+
+export function resumeAudioCtx() {
+  const ctx = getSharedAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+// ─── OBBY RUSH SFX ──────────────────────────────────────────────────────────
+export function playObbySound(type, combo = 0) {
+  const audioCtx = getSharedAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+
+  if (type === 'jump') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.exponentialRampToValueAtTime(600, t + 0.1);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    osc.start(t); osc.stop(t + 0.15);
+  } else if (type === 'coin') {
+    const pitchBoost = combo * 15;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(880 + pitchBoost, t);
+    osc.frequency.setValueAtTime(1100 + pitchBoost, t + 0.06);
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    osc.start(t); osc.stop(t + 0.15);
+  } else if (type === 'hit') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle'; osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.2);
+    gain.gain.setValueAtTime(0.4, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+    osc.start(t); osc.stop(t + 0.25);
+  } else if (type === 'death') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth'; osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.5);
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+    osc.start(t); osc.stop(t + 0.5);
+  } else if (type === 'land') {
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.setValueAtTime(freq, t + i * 0.04);
+      gain.gain.setValueAtTime(0.15, t + i * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+      osc.start(t + i * 0.04); osc.stop(t + 0.35);
+    });
+  } else if (type === 'heart') {
+    [440, 554, 659].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.setValueAtTime(freq, t + i * 0.08);
+      gain.gain.setValueAtTime(0.2, t + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.08 + 0.25);
+      osc.start(t + i * 0.08); osc.stop(t + i * 0.08 + 0.3);
+    });
+  } else if (type === 'magnet') {
+    const audioCtxLocal = audioCtx;
+    const noise = audioCtxLocal.createBufferSource();
+    const buf = audioCtxLocal.createBuffer(1, audioCtxLocal.sampleRate * 0.12, audioCtxLocal.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    const filter = audioCtxLocal.createBiquadFilter();
+    filter.type = 'bandpass'; filter.frequency.value = 2500; filter.Q.value = 5;
+    const gain = audioCtxLocal.createGain();
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtxLocal.destination);
+    gain.gain.setValueAtTime(0.4, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+    noise.start(t); noise.stop(t + 0.12);
+  }
+}
+
+// ─── BEAT SANDBOX SFX ─────────────────────────────────────────────────────────
+export function playSandboxSound(instrument) {
+  const audioCtx = getSharedAudioCtx();
+  const t = audioCtx.currentTime;
+  const { freq, type } = instrument;
+
+  if (type === 'kick') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+    gain.gain.setValueAtTime(0.8, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+    osc.start(t); osc.stop(t + 0.2);
+  } else if (type === 'snare') {
+    const noise = audioCtx.createBufferSource();
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.1, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'highpass'; filter.frequency.value = 1000;
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0.6, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    noise.start(t); noise.stop(t + 0.1);
+  } else if (type === 'hihat') {
+    const noise = audioCtx.createBufferSource();
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.05, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'highpass'; filter.frequency.value = 5000;
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+    noise.start(t); noise.stop(t + 0.05);
+  } else if (type === 'clap') {
+    for (let c = 0; c < 3; c++) {
+      const noise = audioCtx.createBufferSource();
+      const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.02, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      noise.buffer = buf;
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass'; filter.frequency.value = 2000;
+      noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0.4, t + c * 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + c * 0.015 + 0.04);
+      noise.start(t + c * 0.015); noise.stop(t + c * 0.015 + 0.04);
+    }
+  } else if (type === 'bass') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.4, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+    osc.start(t); osc.stop(t + 0.25);
+  } else if (type === 'synth') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.setValueAtTime(0.2, t + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+    osc.start(t); osc.stop(t + 0.2);
+  }
+}
+
+// ─── PROCEDURAL BACKGROUND MUSIC ─────────────────────────────────────────────
+export function startProceduralMusic() {
+  const audioCtx = getSharedAudioCtx();
+  const bpm = MUSIC.BPM;
+  const beatDur = 60 / bpm;
+  const barDur = beatDur * 4;
+  const loopDur = barDur * 4;
+  const master = audioCtx.createGain();
+  master.gain.value = MUSIC.MASTER_VOLUME;
+  master.connect(audioCtx.destination);
+  let stopped = false, timeoutId;
+
+  const schedule = () => {
+    if (stopped) return;
+    const now = audioCtx.currentTime + 0.05;
+
+    // Pad tones
+    MUSIC.PAD_FREQUENCIES.forEach(freq => {
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      osc.connect(g); g.connect(master);
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(MUSIC.PAD_VOLUME, now + 1);
+      g.gain.setValueAtTime(MUSIC.PAD_VOLUME, now + loopDur - 1.5);
+      g.gain.linearRampToValueAtTime(0, now + loopDur);
+      osc.start(now); osc.stop(now + loopDur + 0.1);
+    });
+
+    // Kick and offbeat per bar
+    for (let bar = 0; bar < 4; bar++) {
+      const bt = now + bar * barDur;
+      const osc = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      osc.connect(g); g.connect(master);
+      osc.frequency.setValueAtTime(MUSIC.KICK_FREQ_START, bt);
+      osc.frequency.exponentialRampToValueAtTime(MUSIC.KICK_FREQ_END, bt + 0.12);
+      g.gain.setValueAtTime(MUSIC.KICK_VOLUME, bt);
+      g.gain.exponentialRampToValueAtTime(0.001, bt + 0.15);
+      osc.start(bt); osc.stop(bt + 0.2);
+
+      const bt2 = bt + beatDur * 2;
+      const osc2 = audioCtx.createOscillator();
+      const g2 = audioCtx.createGain();
+      osc2.connect(g2); g2.connect(master);
+      osc2.frequency.setValueAtTime(MUSIC.OFFBEAT_FREQ_START, bt2);
+      osc2.frequency.exponentialRampToValueAtTime(MUSIC.OFFBEAT_FREQ_END, bt2 + 0.1);
+      g2.gain.setValueAtTime(MUSIC.OFFBEAT_VOLUME, bt2);
+      g2.gain.exponentialRampToValueAtTime(0.001, bt2 + 0.12);
+      osc2.start(bt2); osc2.stop(bt2 + 0.15);
+    }
+
+    timeoutId = setTimeout(schedule, (loopDur - 0.2) * 1000);
+  };
+
+  schedule();
+
+  return {
+    stop() {
+      stopped = true;
+      clearTimeout(timeoutId);
+      master.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+    },
+  };
+}

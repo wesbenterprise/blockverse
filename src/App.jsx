@@ -1094,7 +1094,7 @@ export default function BlockVerse() {
   const currentGame = GAMES.find(g => g.id === screen);
   if (screen === 'customizer') return <Customizer av={avatar} setAv={setAvatar} coins={coins} setCoins={setCoins} onBack={() => setScreen('lobby')} owned={owned} setOwned={setOwned}/>;
   if (screen === 'obby') return <ObbyRush avatar={avatar} onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins}/>;
-  if (screen === 'beats') return <BeatSandbox onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins}/>;
+  if (screen === 'sandbox' || screen === 'beats') return <BeatSandbox onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins}/>;
   if (currentGame) return <ComingSoon game={currentGame} onBack={() => setScreen('lobby')}/>;
 
   return (

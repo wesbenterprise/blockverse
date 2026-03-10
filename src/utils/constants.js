@@ -151,6 +151,104 @@ export const SAVE_KEY = 'blockverse_save';
 export const TOAST_DURATION_MS = 3000;
 export const COIN_TOAST_DURATION_MS = 2500;
 
+// ─── CRYSTAL MINE CONSTANTS ──────────────────────────────────────────────────
+export const CRYSTAL_MINE = {
+  CANVAS_W: 480,
+  CANVAS_H: 400,
+  HUD_TOP_H: 40,
+  HUD_BOTTOM_H: 36,
+  SHAFT_Y: 40,
+  SHAFT_H: 324,
+  BLOCK_SIZE: 80,
+  BLOCK_GAP: 8,
+  GRID_COLS: 3,
+  GRID_X_OFFSET: 112, // (480 - 256) / 2
+  GRID_WIDTH: 256,     // 80+8+80+8+80
+  VISIBLE_ROWS: 4,
+  ORES_PER_LAYER: 8,
+  MAX_MISSES: 5,
+  MISS_TIMEOUT_BEATS: 2,
+  HIGH_SCORE_KEY: 'crystal_mine_best',
+
+  // Column cycle for 8 ores: center, left, right, center, left, right, center, left
+  COLUMN_CYCLE: [1, 0, 2, 1, 0, 2, 1, 0],
+
+  // Colors
+  BG_SHAFT: '#1a1a2e',
+  WALL_COLOR: '#2d2d44',
+  WALL_ACCENT: '#3d3d5c',
+  HUD_BG: '#0f0f1b',
+  HUD_TEXT: '#e0e0e0',
+  HEART_FULL: '#ff4757',
+  HEART_EMPTY: '#4a4a4a',
+  BEAT_INDICATOR_COLOR: '#ffd700',
+  HIGHLIGHT_GLOW: 'rgba(255,255,255,0.4)',
+  MISS_CRACK_COLOR: '#8b4513',
+  DEPTH_TEXT_COLOR: '#00d2ff',
+  COIN_COLOR: '#ffd700',
+  XP_BAR_FILL: '#7c4dff',
+  XP_BAR_BG: '#2a2a3e',
+
+  // Ore types in order
+  ORE_TYPES: [
+    { id: 'coal',     name: 'Coal',     color: '#4a4a4a', accent: '#6a6a6a', coinValue: 1,  freq: 262, waveform: 'triangle', minLayer: 1  },
+    { id: 'copper',   name: 'Copper',   color: '#cd7f32', accent: '#e8a84c', coinValue: 2,  freq: 330, waveform: 'square',   minLayer: 1  },
+    { id: 'iron',     name: 'Iron',     color: '#8a8a8a', accent: '#b0b0b0', coinValue: 3,  freq: 294, waveform: 'sawtooth', minLayer: 3  },
+    { id: 'gold',     name: 'Gold',     color: '#ffd700', accent: '#fff44f', coinValue: 5,  freq: 392, waveform: 'sine',     minLayer: 6  },
+    { id: 'ruby',     name: 'Ruby',     color: '#e0115f', accent: '#ff4488', coinValue: 8,  freq: 440, waveform: 'sine',     minLayer: 10 },
+    { id: 'sapphire', name: 'Sapphire', color: '#0f52ba', accent: '#4488ff', coinValue: 10, freq: 524, waveform: 'triangle', minLayer: 15 },
+    { id: 'emerald',  name: 'Emerald',  color: '#50c878', accent: '#80ffaa', coinValue: 12, freq: 588, waveform: 'square',   minLayer: 20 },
+    { id: 'diamond',  name: 'Diamond',  color: '#b9f2ff', accent: '#ffffff', coinValue: 20, freq: 784, waveform: 'sine',     minLayer: 28 },
+  ],
+
+  // BPM by layer range: [maxLayer, bpm] — first match where layer <= maxLayer
+  BPM_TABLE: [
+    [2,  100],
+    [5,  108],
+    [9,  116],
+    [14, 128],
+    [19, 140],
+    [24, 152],
+    [27, 164],
+    [32, 176],
+    [Infinity, 180],
+  ],
+
+  // Timing windows by layer range: [maxLayer, windowMs]
+  TIMING_TABLE: [
+    [5,  150],
+    [14, 110],
+    [24, 90],
+    [32, 75],
+    [Infinity, 65],
+  ],
+
+  // Spawn distributions: [maxLayer, { oreId: weight, ... }]
+  SPAWN_TABLE: [
+    [2,  { coal: 60, copper: 40 }],
+    [5,  { coal: 40, copper: 30, iron: 30 }],
+    [9,  { coal: 20, copper: 25, iron: 30, gold: 25 }],
+    [14, { coal: 10, copper: 15, iron: 25, gold: 30, ruby: 20 }],
+    [19, { coal: 5, copper: 10, iron: 15, gold: 25, ruby: 25, sapphire: 20 }],
+    [27, { copper: 5, iron: 10, gold: 20, ruby: 25, sapphire: 20, emerald: 20 }],
+    [Infinity, { iron: 5, gold: 15, ruby: 20, sapphire: 20, emerald: 20, diamond: 20 }],
+  ],
+
+  // Particle settings
+  ORE_BREAK_PARTICLES: { count: [8, 12], size: [4, 8], speed: [60, 180], gravity: 200, life: [400, 600] },
+  COLLAPSE_PARTICLES: { count: [6, 10], size: [12, 20], color: '#5c3a1a', speed: [300, 500] },
+  COIN_PARTICLES: { count: [3, 5], size: 4, floatDist: 60, life: 500 },
+
+  // Shake
+  MISS_SHAKE_PX: 4,
+  MISS_SHAKE_MS: 100,
+  COLLAPSE_SHAKE_PX: 8,
+  COLLAPSE_SHAKE_MS: 300,
+
+  // Scroll animation
+  SCROLL_DURATION_MS: 200,
+};
+
 // ─── PROCEDURAL MUSIC CONSTANTS ───────────────────────────────────────────────
 export const MUSIC = {
   BPM: 90,

@@ -175,6 +175,139 @@ export function playSandboxSound(instrument) {
   }
 }
 
+// ─── CRYSTAL MINE SFX ────────────────────────────────────────────────────────
+export function playCrystalMineSound(type, oreType) {
+  const audioCtx = getSharedAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+
+  if (type === 'metronome') {
+    // oreType here is { downbeat: bool }
+    const freq = oreType?.downbeat ? 1000 : 800;
+    const vol = oreType?.downbeat ? 0.12 : 0.08;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, t);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + 0.002);
+    gain.gain.linearRampToValueAtTime(0, t + 0.032);
+    osc.start(t); osc.stop(t + 0.035);
+  } else if (type === 'ore') {
+    // oreType is the ore object from CRYSTAL_MINE.ORE_TYPES
+    if (!oreType) return;
+    const ore = oreType;
+
+    if (ore.id === 'ruby') {
+      // Dual sine: 440 + 880
+      [440, 880].forEach(freq => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(freq, t);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.18, t + 0.003);
+        gain.gain.linearRampToValueAtTime(0.06, t + 0.153);
+        gain.gain.linearRampToValueAtTime(0, t + 0.273);
+        osc.start(t); osc.stop(t + 0.28);
+      });
+    } else if (ore.id === 'diamond') {
+      // Dual sine: 784 + 1176 (fifth)
+      [784, 1176].forEach(freq => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(freq, t);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.15, t + 0.002);
+        gain.gain.linearRampToValueAtTime(0.12, t + 0.302);
+        gain.gain.linearRampToValueAtTime(0, t + 0.552);
+        osc.start(t); osc.stop(t + 0.56);
+      });
+    } else if (ore.id === 'emerald') {
+      // Square wave through lowpass filter
+      const osc = audioCtx.createOscillator();
+      const filter = audioCtx.createBiquadFilter();
+      const gain = audioCtx.createGain();
+      osc.type = 'square'; osc.frequency.setValueAtTime(588, t);
+      filter.type = 'lowpass'; filter.frequency.value = 1200; filter.Q.value = 1.0;
+      osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.15, t + 0.005);
+      gain.gain.linearRampToValueAtTime(0.10, t + 0.255);
+      gain.gain.linearRampToValueAtTime(0, t + 0.455);
+      osc.start(t); osc.stop(t + 0.46);
+    } else {
+      // Standard single oscillator ores
+      const configs = {
+        coal:     { freq: 262, wave: 'triangle', gain: 0.25, attack: 0.005, decay: 0.080, sustain: 0,    release: 0.050 },
+        copper:   { freq: 330, wave: 'square',   gain: 0.20, attack: 0.003, decay: 0.100, sustain: 0.05, release: 0.080 },
+        iron:     { freq: 294, wave: 'sawtooth', gain: 0.22, attack: 0.002, decay: 0.120, sustain: 0.08, release: 0.100 },
+        gold:     { freq: 392, wave: 'sine',     gain: 0.28, attack: 0.005, decay: 0.200, sustain: 0.10, release: 0.150 },
+        sapphire: { freq: 524, wave: 'triangle', gain: 0.22, attack: 0.002, decay: 0.180, sustain: 0.08, release: 0.140 },
+      };
+      const cfg = configs[ore.id];
+      if (!cfg) return;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = cfg.wave; osc.frequency.setValueAtTime(cfg.freq, t);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(cfg.gain, t + cfg.attack);
+      gain.gain.linearRampToValueAtTime(cfg.sustain, t + cfg.attack + cfg.decay);
+      gain.gain.linearRampToValueAtTime(0, t + cfg.attack + cfg.decay + cfg.release);
+      osc.start(t); osc.stop(t + cfg.attack + cfg.decay + cfg.release + 0.01);
+    }
+  } else if (type === 'miss') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(120, t);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.3, t + 0.002);
+    gain.gain.linearRampToValueAtTime(0, t + 0.062);
+    osc.start(t); osc.stop(t + 0.065);
+  } else if (type === 'collapse') {
+    // Sawtooth sweep 80→40Hz
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(80, t);
+    osc1.frequency.linearRampToValueAtTime(40, t + 0.6);
+    osc1.connect(gain1); gain1.connect(audioCtx.destination);
+    gain1.gain.setValueAtTime(0, t);
+    gain1.gain.linearRampToValueAtTime(0.4, t + 0.01);
+    gain1.gain.linearRampToValueAtTime(0.1, t + 0.41);
+    gain1.gain.linearRampToValueAtTime(0, t + 0.61);
+    osc1.start(t); osc1.stop(t + 0.62);
+
+    // White noise
+    const noise = audioCtx.createBufferSource();
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.6, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    const gain2 = audioCtx.createGain();
+    noise.connect(gain2); gain2.connect(audioCtx.destination);
+    gain2.gain.setValueAtTime(0.2, t);
+    gain2.gain.linearRampToValueAtTime(0, t + 0.6);
+    noise.start(t); noise.stop(t + 0.61);
+  } else if (type === 'coin_jingle') {
+    // C5-E5-G5 rapid arpeggio
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.setValueAtTime(freq, t + i * 0.08);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0, t + i * 0.08);
+      gain.gain.linearRampToValueAtTime(0.15, t + i * 0.08 + 0.002);
+      gain.gain.linearRampToValueAtTime(0, t + i * 0.08 + 0.082);
+      osc.start(t + i * 0.08); osc.stop(t + i * 0.08 + 0.085);
+    });
+  }
+}
+
 // ─── PROCEDURAL BACKGROUND MUSIC ─────────────────────────────────────────────
 export function startProceduralMusic() {
   const audioCtx = getSharedAudioCtx();

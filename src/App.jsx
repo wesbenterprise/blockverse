@@ -6,6 +6,7 @@ import ObbyRush from './components/ObbyRush.jsx';
 import BeatSandbox from './components/BeatSandbox.jsx';
 import Customizer from './components/Customizer.jsx';
 import ComingSoon from './components/ComingSoon.jsx';
+import CrystalMine from './components/CrystalMine.jsx';
 
 // Utilities
 import { resumeAudioCtx, startProceduralMusic } from './utils/audio.js';
@@ -79,6 +80,9 @@ export default function BlockVerse() {
   }
   if (screen === 'sandbox' || screen === 'beats') {
     return <BeatSandbox onBack={goToLobby} coins={coins} setCoins={setCoins} setXp={setXp} />;
+  }
+  if (screen === 'mining') {
+    return <CrystalMine onBack={goToLobby} coins={coins} setCoins={setCoins} setXp={setXp} />;
   }
 
   const currentGame = GAMES.find(g => g.id === screen);

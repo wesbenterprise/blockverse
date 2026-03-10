@@ -52,6 +52,96 @@ const ACCESSORIES = [
   { id: 'trumpet', label: 'Trumpet', icon: '🎺', cost: 150 },
 ];
 
+// ─── LEVEL SYSTEM ────────────────────────────────────────────────────────────
+const LEVEL_THRESHOLDS = [0, 10, 30, 60, 100, 150, 210, 280, 360, 450];
+const LEVEL_TITLES = { 1:'Rookie',2:'Rookie',3:'Rookie',4:'Beat Maker',5:'Beat Maker',6:'Rhythm Star',7:'Rhythm Star',8:'Music Master',9:'Music Master',10:'BlockVerse Legend' };
+function getLevel(xp) { for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) { if (xp >= LEVEL_THRESHOLDS[i]) return i + 1; } return 1; }
+function getLevelTitle(level) { return LEVEL_TITLES[level] || 'Rookie'; }
+function getLevelProgress(xp) {
+  const lvl = getLevel(xp);
+  if (lvl >= 10) return 1;
+  const cur = LEVEL_THRESHOLDS[lvl - 1];
+  const next = LEVEL_THRESHOLDS[lvl];
+  return (xp - cur) / (next - cur);
+}
+
+// ─── OBBY RUSH SFX ──────────────────────────────────────────────────────────
+function playObbySound(audioCtx, type) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  if (type === 'jump') {
+    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(300, t); osc.frequency.exponentialRampToValueAtTime(600, t + 0.1);
+    gain.gain.setValueAtTime(0.25, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    osc.start(t); osc.stop(t + 0.15);
+  } else if (type === 'coin') {
+    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(880, t); osc.frequency.setValueAtTime(1100, t + 0.06);
+    gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+    osc.start(t); osc.stop(t + 0.15);
+  } else if (type === 'hit') {
+    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+    osc.type = 'triangle'; osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(120, t); osc.frequency.exponentialRampToValueAtTime(50, t + 0.2);
+    gain.gain.setValueAtTime(0.4, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+    osc.start(t); osc.stop(t + 0.25);
+  } else if (type === 'death') {
+    const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+    osc.type = 'sawtooth'; osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(400, t); osc.frequency.exponentialRampToValueAtTime(80, t + 0.5);
+    gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+    osc.start(t); osc.stop(t + 0.5);
+  } else if (type === 'land') {
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.setValueAtTime(freq, t + i * 0.04);
+      gain.gain.setValueAtTime(0.15, t + i * 0.04); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
+      osc.start(t + i * 0.04); osc.stop(t + 0.35);
+    });
+  }
+}
+
+// ─── PROCEDURAL BACKGROUND MUSIC ─────────────────────────────────────────────
+function startProceduralMusic(audioCtx) {
+  const bpm = 90, beatDur = 60 / bpm, barDur = beatDur * 4, loopDur = barDur * 4;
+  const master = audioCtx.createGain();
+  master.gain.value = 0.12;
+  master.connect(audioCtx.destination);
+  let stopped = false, timeoutId;
+  const schedule = () => {
+    if (stopped) return;
+    const now = audioCtx.currentTime + 0.05;
+    [130.81, 164.81, 196.00, 246.94].forEach(freq => {
+      const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      osc.connect(g); g.connect(master);
+      g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(0.06, now + 1);
+      g.gain.setValueAtTime(0.06, now + loopDur - 1.5); g.gain.linearRampToValueAtTime(0, now + loopDur);
+      osc.start(now); osc.stop(now + loopDur + 0.1);
+    });
+    for (let bar = 0; bar < 4; bar++) {
+      const bt = now + bar * barDur;
+      const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+      osc.connect(g); g.connect(master);
+      osc.frequency.setValueAtTime(60, bt); osc.frequency.exponentialRampToValueAtTime(25, bt + 0.12);
+      g.gain.setValueAtTime(0.15, bt); g.gain.exponentialRampToValueAtTime(0.001, bt + 0.15);
+      osc.start(bt); osc.stop(bt + 0.2);
+      const bt2 = bt + beatDur * 2;
+      const osc2 = audioCtx.createOscillator(); const g2 = audioCtx.createGain();
+      osc2.connect(g2); g2.connect(master);
+      osc2.frequency.setValueAtTime(50, bt2); osc2.frequency.exponentialRampToValueAtTime(25, bt2 + 0.1);
+      g2.gain.setValueAtTime(0.08, bt2); g2.gain.exponentialRampToValueAtTime(0.001, bt2 + 0.12);
+      osc2.start(bt2); osc2.stop(bt2 + 0.15);
+    }
+    timeoutId = setTimeout(schedule, (loopDur - 0.2) * 1000);
+  };
+  schedule();
+  return { stop() { stopped = true; clearTimeout(timeoutId); master.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5); } };
+}
+
 const GAMES = [
   { id: 'obby',    name: 'Obby Rush',     icon: '🏃', color: '#FF6B6B', bg: '#fff5f5', desc: 'Race & jump to the beat!',    note: '♩', coinReward: '10–30' },
   { id: 'sandbox', name: 'Beat Sandbox',  icon: '🧱', color: '#00CEC9', bg: '#f0fffe', desc: 'Build worlds with music!',     note: '♫', coinReward: '5–20'  },
@@ -311,8 +401,13 @@ function ComingSoon({ game, onBack }) {
 }
 
 // ─── OBBY RUSH GAME ───────────────────────────────────────────────────────────
-function ObbyRush({ avatar, onBack, coins, setCoins }) {
+function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
   const canvasRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const getAudioCtx = () => {
+    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtxRef.current;
+  };
   const gameRef = useRef({
     player: { x: 80, y: 260, vy: 0, jumping: false, grounded: true },
     obstacles: [],
@@ -327,6 +422,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
     beatPhase: 0,
     lives: 3,
     invincible: 0,
+    magnetTimer: 0,
     highScore: parseInt(localStorage.getItem('obby_high') || '0'),
   });
   const [displayScore, setDisplayScore] = useState(0);
@@ -334,6 +430,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
   const [displayLives, setDisplayLives] = useState(3);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
+  const [magnetActive, setMagnetActive] = useState(false);
   const animRef = useRef(null);
 
   const GRAVITY = 0.55;
@@ -350,6 +447,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
       g.player.vy = JUMP_FORCE;
       g.player.jumping = true;
       g.player.grounded = false;
+      playObbySound(getAudioCtx(), 'jump');
     }
   };
 
@@ -366,6 +464,16 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
 
     const spawnObstacle = () => {
       const g = gameRef.current;
+
+      // Tall narrow gap obstacle (score > 500, 15% chance)
+      if (g.score > 500 && Math.random() < 0.15) {
+        const gapX = CANVAS_W + 20;
+        g.obstacles.push({ x: gapX, y: GROUND_Y + 30 - 32, w: 20, h: 32, color: '#a29bfe', isGap: true });
+        g.obstacles.push({ x: gapX, y: GROUND_Y + 30 - 110, w: 20, h: 42, color: '#a29bfe', isGap: true });
+        if (Math.random() > 0.3) g.coins.push({ x: gapX + 2, y: GROUND_Y + 30 - 72, w: 16, h: 16, collected: false });
+        return;
+      }
+
       const types = [
         { w: 28, h: 36, color: '#FF6B6B' },
         { w: 22, h: 52, color: '#e17055' },
@@ -373,7 +481,17 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
         { w: 18, h: 44, color: '#ff7675' },
       ];
       const t = types[Math.floor(Math.random() * types.length)];
-      g.obstacles.push({ x: CANVAS_W + 20, y: GROUND_Y + 30 - t.h, w: t.w, h: t.h, color: t.color });
+      const obs = { x: CANVAS_W + 20, y: GROUND_Y + 30 - t.h, w: t.w, h: t.h, color: t.color };
+
+      // Moving obstacle (score > 300, 20% chance)
+      if (g.score > 300 && Math.random() < 0.2) {
+        obs.moving = true;
+        obs.baseY = obs.y;
+        obs.movePhase = Math.random() * Math.PI * 2;
+        obs.color = '#74b9ff';
+      }
+
+      g.obstacles.push(obs);
       // Coin above some obstacles
       if (Math.random() > 0.4) {
         g.coins.push({ x: CANVAS_W + 20 + t.w / 2 - 8, y: GROUND_Y + 30 - t.h - 40, w: 16, h: 16, collected: false });
@@ -381,6 +499,10 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
       // Rare heart pickup (~8% chance, only if missing lives)
       if (g.lives < 3 && Math.random() < 0.08) {
         g.coins.push({ x: CANVAS_W + 60 + Math.random() * 40, y: GROUND_Y + 30 - t.h - 65, w: 18, h: 18, collected: false, isHeart: true });
+      }
+      // Rare coin magnet power-up (score > 200, 3% chance)
+      if (g.score > 200 && Math.random() < 0.03) {
+        g.coins.push({ x: CANVAS_W + 80, y: GROUND_Y + 30 - t.h - 55, w: 18, h: 18, collected: false, isMagnet: true });
       }
     };
 
@@ -409,7 +531,10 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
         if (g.frame % Math.max(55, 90 - Math.floor(g.score / 200) * 5) === 0) spawnObstacle();
 
         // Move obstacles
-        g.obstacles.forEach(o => { o.x -= g.speed; });
+        g.obstacles.forEach(o => {
+          o.x -= g.speed;
+          if (o.moving) o.y = o.baseY + Math.sin(g.frame * 0.05 + o.movePhase) * 25;
+        });
         g.obstacles = g.obstacles.filter(o => o.x + o.w > -20);
 
         // Move coins
@@ -418,6 +543,18 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
 
         // Tick down invincibility frames
         if (g.invincible > 0) g.invincible--;
+
+        // Coin magnet effect
+        if (g.magnetTimer > 0) {
+          g.magnetTimer--;
+          setMagnetActive(g.magnetTimer > 0);
+          for (const c of g.coins) {
+            if (!c.collected && !c.isHeart && !c.isMagnet) {
+              const dist = Math.hypot((c.x + 8) - (g.player.x + 20), (c.y + 8) - (g.player.y + 20));
+              if (dist < 150) { c.x += (g.player.x + 12 - c.x) * 0.15; c.y += (g.player.y + 12 - c.y) * 0.15; }
+            }
+          }
+        }
 
         // Collision (player hitbox is smaller than visual)
         const px = g.player.x + 6, py = g.player.y + 4, pw = 28, ph = 36;
@@ -434,6 +571,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
               g.player.jumping = false;
               // Bonus points for landing on top
               g.score += 25;
+              playObbySound(getAudioCtx(), 'land');
               // Sparkle effect
               for (let i = 0; i < 4; i++) {
                 g.particles.push({
@@ -448,6 +586,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
             if (g.invincible > 0) continue;
             g.lives--;
             setDisplayLives(g.lives);
+            playObbySound(getAudioCtx(), 'hit');
             // Hit particles (smaller burst than death)
             for (let i = 0; i < 8; i++) {
               g.particles.push({
@@ -462,6 +601,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
               // Final death — game over
               g.gameOver = true;
               setGameOver(true);
+              playObbySound(getAudioCtx(), 'death');
               // Big crash particles
               for (let i = 0; i < 12; i++) {
                 g.particles.push({
@@ -478,6 +618,8 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
               }
               const earned = g.coinsCollected;
               if (earned > 0) setCoins(c => c + earned);
+              const xpEarned = Math.floor(g.score / 100);
+              if (xpEarned > 0) setXp(x => x + xpEarned);
             } else {
               // Still alive — brief invincibility (90 frames = 1.5 sec) + bounce up
               g.invincible = 90;
@@ -493,7 +635,14 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
         for (const c of g.coins) {
           if (!c.collected && px < c.x + c.w + coinPad && px + pw > c.x - coinPad && py < c.y + c.h + coinPad && py + ph > c.y - coinPad) {
             c.collected = true;
-            if (c.isHeart) {
+            if (c.isMagnet) {
+              g.magnetTimer = 300; // 5 seconds at 60fps
+              setMagnetActive(true);
+              playObbySound(getAudioCtx(), 'coin');
+              for (let i = 0; i < 10; i++) {
+                g.particles.push({ x: c.x+9, y: c.y+9, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:25, color:['#74b9ff','#00cec9','#a29bfe'][Math.floor(Math.random()*3)], size:3+Math.random()*4 });
+              }
+            } else if (c.isHeart) {
               // Heart pickup — restore a life
               g.lives = Math.min(3, g.lives + 1);
               setDisplayLives(g.lives);
@@ -506,6 +655,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
               }
             } else {
               g.coinsCollected++;
+              playObbySound(getAudioCtx(), 'coin');
               // Sparkle
               for (let i = 0; i < 6; i++) {
                 g.particles.push({
@@ -566,22 +716,44 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
       g.obstacles.forEach(o => {
         ctx.fillStyle = o.color;
         ctx.fillRect(o.x, o.y, o.w, o.h);
-        // Highlight
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
         ctx.fillRect(o.x + 2, o.y + 2, o.w - 4, 6);
-        // Shadow
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
         ctx.fillRect(o.x + 2, o.y + o.h - 6, o.w - 4, 4);
-        // Block lines
         ctx.strokeStyle = 'rgba(0,0,0,0.15)';
         ctx.lineWidth = 1;
         ctx.strokeRect(o.x, o.y, o.w, o.h);
+        if (o.moving) {
+          ctx.fillStyle = 'rgba(116,185,255,0.3)';
+          ctx.fillRect(o.x - 2, o.y - 2, o.w + 4, o.h + 4);
+          ctx.fillStyle = 'white'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('↕', o.x + o.w / 2, o.y - 4);
+        }
+        if (o.isGap) {
+          ctx.strokeStyle = '#a29bfe'; ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]); ctx.strokeRect(o.x - 1, o.y - 1, o.w + 2, o.h + 2); ctx.setLineDash([]);
+        }
       });
 
-      // Coins & Hearts
+      // Magnet aura around player
+      if (g.magnetTimer > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.15 + Math.sin(g.frame * 0.1) * 0.08;
+        ctx.strokeStyle = '#74b9ff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(g.player.x + 20, g.player.y + 20, 60, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(g.player.x + 20, g.player.y + 20, 80, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+
+      // Coins, Hearts & Magnets
       g.coins.filter(c => !c.collected).forEach(c => {
         const bounce = Math.sin(g.frame * 0.1 + c.x) * 3;
-        if (c.isHeart) {
+        if (c.isMagnet) {
+          ctx.save(); ctx.translate(c.x + 9, c.y + 9 + bounce);
+          const pulse = 1 + Math.sin(g.frame * 0.12) * 0.15; ctx.scale(pulse, pulse);
+          ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText('🧲', 0, 0); ctx.restore();
+        } else if (c.isHeart) {
           // Heart pickup — pulsing red heart
           const pulse = 1 + Math.sin(g.frame * 0.15) * 0.15;
           ctx.save();
@@ -753,7 +925,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
       g.obstacles = []; g.particles = []; g.coins = [];
       g.score = 0; g.coinsCollected = 0; g.speed = 3.5;
       g.frame = 0; g.gameOver = false; g.started = true;
-      g.lives = 3; g.invincible = 0;
+      g.lives = 3; g.invincible = 0; g.magnetTimer = 0;
       setGameOver(false); setStarted(true);
       setDisplayScore(0); setDisplayCoins(0); setDisplayLives(3);
     } else {
@@ -877,7 +1049,7 @@ function playSound(audioCtx, instrument) {
   }
 }
 
-function BeatSandbox({ onBack, coins, setCoins }) {
+function BeatSandbox({ onBack, coins, setCoins, setXp }) {
   const [grid, setGrid] = useState(() => {
     const saved = localStorage.getItem('beat_sandbox_grid');
     if (saved) try { return JSON.parse(saved); } catch {}
@@ -886,9 +1058,12 @@ function BeatSandbox({ onBack, coins, setCoins }) {
   const [playing, setPlaying] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
   const [bpm, setBpm] = useState(120);
+  const [coinToast, setCoinToast] = useState(0);
   const audioCtxRef = useRef(null);
   const intervalRef = useRef(null);
   const stepRef = useRef(0);
+  const loopsRef = useRef(0);
+  const playStartRef = useRef(0);
 
   const getAudioCtx = () => {
     if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
@@ -915,11 +1090,24 @@ function BeatSandbox({ onBack, coins, setCoins }) {
       clearInterval(intervalRef.current);
       setPlaying(false);
       setCurrentStep(-1);
+      // Award coins if at least one full loop completed
+      if (loopsRef.current >= 1) {
+        const uniqueInsts = grid.reduce((c, row) => row.some(Boolean) ? c + 1 : c, 0);
+        const reward = Math.min(uniqueInsts * 2, 20);
+        if (reward > 0) { setCoins(c => c + reward); setCoinToast(reward); setTimeout(() => setCoinToast(0), 2500); }
+      }
+      // Award XP for playback time
+      const playSeconds = (Date.now() - playStartRef.current) / 1000;
+      const xpEarned = Math.floor(playSeconds / 30);
+      if (xpEarned > 0) setXp(x => x + xpEarned);
       stepRef.current = 0;
+      loopsRef.current = 0;
     } else {
       const ctx = getAudioCtx();
       if (ctx.state === 'suspended') ctx.resume();
       stepRef.current = 0;
+      loopsRef.current = 0;
+      playStartRef.current = Date.now();
       setPlaying(true);
       setCurrentStep(0);
       const ms = (60 / bpm / 4) * 1000; // 16th notes
@@ -930,6 +1118,7 @@ function BeatSandbox({ onBack, coins, setCoins }) {
           if (row[s]) playSound(ctx, INSTRUMENTS[i]);
         });
         stepRef.current = (s + 1) % STEPS;
+        if (stepRef.current === 0) loopsRef.current++;
       }, ms);
     }
   };
@@ -1053,6 +1242,13 @@ function BeatSandbox({ onBack, coins, setCoins }) {
         <div style={{textAlign:'center',marginTop:16,color:'rgba(255,255,255,0.3)',fontSize:12}}>
           Tap squares to add beats • Hit Play to hear your creation • Try Random for inspiration!
         </div>
+
+        {/* Coin reward toast */}
+        {coinToast > 0 && (
+          <div style={{position:'fixed',top:80,left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#FFD700,#FFA500)',color:'white',borderRadius:16,padding:'12px 28px',fontFamily:"'Fredoka One',cursive",fontSize:18,boxShadow:'0 6px 24px rgba(255,165,0,0.5)',zIndex:100,animation:'slideUp 0.4s ease'}}>
+            🪙 +{coinToast} coins earned!
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1068,52 +1264,82 @@ function loadSave() {
     const data = JSON.parse(raw);
     return {
       coins: data.coins ?? 350,
+      xp: data.xp ?? 0,
       owned: new Set(data.owned || []),
       avatar: data.avatar || { skinColor: '#FDBCB4', shirtColor: '#6C5CE7', pantsColor: '#2D3436', hatId: 'cap', accessoryId: 'none' },
+      lastLoginDate: data.lastLoginDate || '',
     };
   } catch { return null; }
 }
 
-function writeSave(coins, owned, avatar) {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ coins, owned: [...owned], avatar }));
+function writeSave(coins, owned, avatar, xp, lastLoginDate) {
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ coins, owned: [...owned], avatar, xp, lastLoginDate }));
 }
 
 export default function BlockVerse() {
   const save = useRef(loadSave()).current;
   const [screen, setScreen] = useState('lobby');
   const [coins, setCoins] = useState(save?.coins ?? 350);
+  const [xp, setXp] = useState(save?.xp ?? 0);
   const [owned, setOwned] = useState(save?.owned ?? new Set());
   const [avatar, setAvatar] = useState(save?.avatar ?? {
     skinColor: '#FDBCB4', shirtColor: '#6C5CE7',
     pantsColor: '#2D3436', hatId: 'cap', accessoryId: 'none',
   });
   const [musicPlaying, setMusicPlaying] = useState(false);
+  const [dailyToast, setDailyToast] = useState(false);
+  const [levelUpToast, setLevelUpToast] = useState(0);
   const musicRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const lastLoginRef = useRef(save?.lastLoginDate || '');
+  const prevLevelRef = useRef(getLevel(save?.xp ?? 0));
 
-  // Background music
+  // Daily login bonus
   useEffect(() => {
-    const audio = new Audio('/pixel-dreams.mp3');
-    audio.loop = true;
-    audio.volume = 0.3;
-    musicRef.current = audio;
-    return () => { audio.pause(); audio.src = ''; };
+    const today = new Date().toISOString().slice(0, 10);
+    if (lastLoginRef.current !== today) {
+      setCoins(c => c + 25);
+      lastLoginRef.current = today;
+      setDailyToast(true);
+      setTimeout(() => setDailyToast(false), 3000);
+    }
   }, []);
 
+  // Level up detection
+  useEffect(() => {
+    const newLevel = getLevel(xp);
+    if (newLevel > prevLevelRef.current) {
+      setCoins(c => c + 15);
+      setLevelUpToast(newLevel);
+      setTimeout(() => setLevelUpToast(0), 3000);
+    }
+    prevLevelRef.current = newLevel;
+  }, [xp]);
+
+  // Procedural background music
+  const getAudioCtx = () => {
+    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtxRef.current;
+  };
+
   const toggleMusic = () => {
-    const audio = musicRef.current;
-    if (!audio) return;
-    if (musicPlaying) { audio.pause(); }
-    else { audio.play().catch(() => {}); }
+    if (musicPlaying) {
+      if (musicRef.current) { musicRef.current.stop(); musicRef.current = null; }
+    } else {
+      const ctx = getAudioCtx();
+      if (ctx.state === 'suspended') ctx.resume();
+      musicRef.current = startProceduralMusic(ctx);
+    }
     setMusicPlaying(!musicPlaying);
   };
 
   // Auto-save on changes
-  useEffect(() => { writeSave(coins, owned, avatar); }, [coins, owned, avatar]);
+  useEffect(() => { writeSave(coins, owned, avatar, xp, lastLoginRef.current); }, [coins, owned, avatar, xp]);
 
   const currentGame = GAMES.find(g => g.id === screen);
   if (screen === 'customizer') return <Customizer av={avatar} setAv={setAvatar} coins={coins} setCoins={setCoins} onBack={() => setScreen('lobby')} owned={owned} setOwned={setOwned}/>;
-  if (screen === 'obby') return <ObbyRush avatar={avatar} onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins}/>;
-  if (screen === 'sandbox' || screen === 'beats') return <BeatSandbox onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins}/>;
+  if (screen === 'obby') return <ObbyRush avatar={avatar} onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins} setXp={setXp}/>;
+  if (screen === 'sandbox' || screen === 'beats') return <BeatSandbox onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins} setXp={setXp}/>;
   if (currentGame) return <ComingSoon game={currentGame} onBack={() => setScreen('lobby')}/>;
 
   return (
@@ -1148,7 +1374,13 @@ export default function BlockVerse() {
               <div style={{color:'#636e72',fontSize:15,marginBottom:6,lineHeight:1.5}}>🎵 Every game has a beat. Every block has a rhythm.<br/>Play games, earn coins, and build your ultimate avatar!</div>
               <div style={{display:'flex',gap:10,flexWrap:'wrap',marginTop:12}}>
                 <button onClick={() => setScreen('customizer')} style={{background:'linear-gradient(135deg,#6C5CE7,#a29bfe)',color:'white',border:'none',borderRadius:50,padding:'11px 24px',fontFamily:"'Fredoka One',cursive",fontSize:16,cursor:'pointer',boxShadow:'0 4px 16px rgba(108,92,231,0.4)',transition:'transform 0.15s'}} onMouseEnter={e=>e.currentTarget.style.transform='scale(1.05)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>🎨 Customize Avatar</button>
-                <div style={{background:'#fff5f5',border:'2px solid #FF6B6B',borderRadius:50,padding:'10px 20px',fontFamily:"'Fredoka One',cursive",color:'#FF6B6B',fontSize:14}}>🏆 Level 1 Rookie</div>
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  <div style={{background:'#fff5f5',border:'2px solid #FF6B6B',borderRadius:50,padding:'10px 20px',fontFamily:"'Fredoka One',cursive",color:'#FF6B6B',fontSize:14}}>🏆 Level {getLevel(xp)} {getLevelTitle(getLevel(xp))}</div>
+                  <div style={{background:'#eee',borderRadius:8,height:8,overflow:'hidden',width:'100%'}}>
+                    <div style={{background:'linear-gradient(90deg,#FF6B6B,#FDCB6E)',height:'100%',borderRadius:8,width:`${getLevelProgress(xp)*100}%`,transition:'width 0.4s ease'}}/>
+                  </div>
+                  <div style={{fontSize:10,color:'#999',fontFamily:'Nunito,sans-serif',textAlign:'center'}}>{xp} XP{getLevel(xp)<10?` / ${LEVEL_THRESHOLDS[getLevel(xp)]} XP`:' (MAX)'}</div>
+                </div>
               </div>
             </div>
             <div style={{textAlign:'center',opacity:0.85}}>
@@ -1167,6 +1399,16 @@ export default function BlockVerse() {
             <MusicBars count={5} color="rgba(255,255,255,0.8)" height={24}/>
           </div>
         </div>
+      {dailyToast && (
+        <div style={{position:'fixed',top:80,left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#00b894,#00cec9)',color:'white',borderRadius:16,padding:'14px 32px',fontFamily:"'Fredoka One',cursive",fontSize:18,boxShadow:'0 6px 24px rgba(0,206,201,0.5)',zIndex:100,animation:'slideUp 0.4s ease'}}>
+          🎁 Daily Bonus! +25 coins
+        </div>
+      )}
+      {levelUpToast > 0 && (
+        <div style={{position:'fixed',top:dailyToast?140:80,left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#6C5CE7,#FD79A8)',color:'white',borderRadius:16,padding:'14px 32px',fontFamily:"'Fredoka One',cursive",fontSize:18,boxShadow:'0 6px 24px rgba(108,92,231,0.5)',zIndex:100,animation:'slideUp 0.4s ease'}}>
+          🎉 Level Up! Level {levelUpToast} {getLevelTitle(levelUpToast)} +15 coins
+        </div>
+      )}
       </div>
     </>
   );

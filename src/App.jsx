@@ -53,8 +53,8 @@ const ACCESSORIES = [
 ];
 
 // ─── LEVEL SYSTEM ────────────────────────────────────────────────────────────
-const LEVEL_THRESHOLDS = [0, 10, 30, 60, 100, 150, 210, 280, 360, 450];
-const LEVEL_TITLES = { 1:'Rookie',2:'Rookie',3:'Rookie',4:'Beat Maker',5:'Beat Maker',6:'Rhythm Star',7:'Rhythm Star',8:'Music Master',9:'Music Master',10:'BlockVerse Legend' };
+const LEVEL_THRESHOLDS = [0, 5, 15, 30, 50, 80, 120, 170, 230, 300];
+const LEVEL_TITLES = { 1:'Rookie',2:'Listener',3:'Beat Maker',4:'Groove Finder',5:'Rhythm Star',6:'Sound Surfer',7:'Mix Master',8:'Music Master',9:'Melody King',10:'BlockVerse Legend' };
 function getLevel(xp) { for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) { if (xp >= LEVEL_THRESHOLDS[i]) return i + 1; } return 1; }
 function getLevelTitle(level) { return LEVEL_TITLES[level] || 'Rookie'; }
 function getLevelProgress(xp) {
@@ -66,7 +66,7 @@ function getLevelProgress(xp) {
 }
 
 // ─── OBBY RUSH SFX ──────────────────────────────────────────────────────────
-function playObbySound(audioCtx, type) {
+function playObbySound(audioCtx, type, combo = 0) {
   if (!audioCtx) return;
   const t = audioCtx.currentTime;
   if (type === 'jump') {
@@ -76,9 +76,10 @@ function playObbySound(audioCtx, type) {
     gain.gain.setValueAtTime(0.25, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
     osc.start(t); osc.stop(t + 0.15);
   } else if (type === 'coin') {
+    const pitchBoost = combo * 15;
     const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
     osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.frequency.setValueAtTime(880, t); osc.frequency.setValueAtTime(1100, t + 0.06);
+    osc.frequency.setValueAtTime(880 + pitchBoost, t); osc.frequency.setValueAtTime(1100 + pitchBoost, t + 0.06);
     gain.gain.setValueAtTime(0.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
     osc.start(t); osc.stop(t + 0.15);
   } else if (type === 'hit') {
@@ -101,6 +102,28 @@ function playObbySound(audioCtx, type) {
       gain.gain.setValueAtTime(0.15, t + i * 0.04); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3);
       osc.start(t + i * 0.04); osc.stop(t + 0.35);
     });
+  } else if (type === 'heart') {
+    // Warm ascending chime — 3 notes, sine wave
+    [440, 554, 659].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.setValueAtTime(freq, t + i * 0.08);
+      gain.gain.setValueAtTime(0.2, t + i * 0.08); gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.08 + 0.25);
+      osc.start(t + i * 0.08); osc.stop(t + i * 0.08 + 0.3);
+    });
+  } else if (type === 'magnet') {
+    // Electric buzz/zap — noise burst with bandpass filter
+    const noise = audioCtx.createBufferSource();
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.12, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass'; filter.frequency.value = 2500; filter.Q.value = 5;
+    const gain = audioCtx.createGain();
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0.4, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+    noise.start(t); noise.stop(t + 0.12);
   }
 }
 
@@ -298,6 +321,7 @@ function GameCard({ game, onPlay }) {
 
 function Customizer({ av, setAv, coins, setCoins, onBack, owned, setOwned }) {
   const [tab, setTab] = useState('skin');
+  const [cantAfford, setCantAfford] = useState(null); // { key, value, need }
   const tabs = [
     { id:'skin', label:'🎨 Skin' }, { id:'shirt', label:'👕 Shirt' },
     { id:'pants', label:'👖 Pants' }, { id:'hat', label:'🎩 Hat' },
@@ -307,6 +331,7 @@ function Customizer({ av, setAv, coins, setCoins, onBack, owned, setOwned }) {
     const itemKey = `${key}:${value}`;
     if (owned.has(itemKey) || cost === 0) { setAv(a => ({...a, [key]: value})); }
     else if (coins >= cost) { setCoins(c => c - cost); setOwned(s => new Set([...s, itemKey])); setAv(a => ({...a, [key]: value})); }
+    else { setCantAfford({ key, value, need: cost - coins }); setTimeout(() => setCantAfford(null), 1500); }
   };
   const isOwned = (key, value, cost) => cost === 0 || owned.has(`${key}:${value}`);
 
@@ -317,7 +342,7 @@ function Customizer({ av, setAv, coins, setCoins, onBack, owned, setOwned }) {
         const got = isOwned(avKey, item.value, item.cost);
         return (
           <div key={item.value} onClick={() => tryBuy(avKey, item.value, item.cost)}
-            style={{borderRadius:12,padding:'10px 6px',cursor:'pointer',textAlign:'center',border:active?'3px solid #6C5CE7':'3px solid transparent',background:active?'#f0eeff':'#f8f8f8',transition:'all 0.15s',opacity:(!got&&coins<item.cost)?0.5:1}}>
+            style={{borderRadius:12,padding:'10px 6px',cursor:'pointer',textAlign:'center',border:active?'3px solid #6C5CE7':'3px solid transparent',background:active?'#f0eeff':'#f8f8f8',transition:'all 0.15s',opacity:(!got&&coins<item.cost)?0.5:1,animation:(cantAfford&&cantAfford.key===avKey&&cantAfford.value===item.value)?'custShake 0.3s ease':'none'}}>
             <div style={{width:32,height:32,borderRadius:8,margin:'0 auto 6px',background:item.value==='rainbow'?'linear-gradient(90deg,#FF6B6B,#FDCB6E,#6C5CE7,#00CEC9)':item.value==='#2D1B69'?'linear-gradient(135deg,#2D1B69,#6C5CE7,#FD79A8)':item.value,border:'2px solid rgba(0,0,0,0.1)'}}/>
             <div style={{fontSize:10,fontFamily:'Nunito,sans-serif',color:'#555',fontWeight:700}}>{item.label}</div>
             {item.cost > 0 && <div style={{fontSize:10,color:got?'#00b894':'#e17055',fontFamily:'Nunito,sans-serif',fontWeight:800}}>{got?'✓ Owned':`🪙 ${item.cost}`}</div>}
@@ -334,7 +359,7 @@ function Customizer({ av, setAv, coins, setCoins, onBack, owned, setOwned }) {
         const got = isOwned(avKey, item.id, item.cost);
         return (
           <div key={item.id} onClick={() => tryBuy(avKey, item.id, item.cost)}
-            style={{borderRadius:14,padding:'12px 8px',cursor:'pointer',textAlign:'center',border:active?'3px solid #6C5CE7':'3px solid #eee',background:active?'#f0eeff':'white',transition:'all 0.15s',opacity:(!got&&coins<item.cost)?0.5:1}}>
+            style={{borderRadius:14,padding:'12px 8px',cursor:'pointer',textAlign:'center',border:active?'3px solid #6C5CE7':'3px solid #eee',background:active?'#f0eeff':'white',transition:'all 0.15s',opacity:(!got&&coins<item.cost)?0.5:1,animation:(cantAfford&&cantAfford.key===avKey&&cantAfford.value===item.id)?'custShake 0.3s ease':'none'}}>
             <div style={{fontSize:32,marginBottom:4}}>{item.icon}</div>
             <div style={{fontSize:12,fontFamily:"'Fredoka One',cursive",color:'#444',marginBottom:2}}>{item.label}</div>
             {item.cost > 0 && <div style={{fontSize:11,color:got?'#00b894':'#e17055',fontFamily:'Nunito,sans-serif',fontWeight:800}}>{got?'✓ Owned':`🪙 ${item.cost}`}</div>}
@@ -346,7 +371,13 @@ function Customizer({ av, setAv, coins, setCoins, onBack, owned, setOwned }) {
 
   return (
     <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#2D1B69,#6C5CE7,#FD79A8)',padding:'16px',fontFamily:'Nunito,sans-serif',position:'relative'}}>
+      <style>{`@keyframes custShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(6px)} 75%{transform:translateX(-4px)} }`}</style>
       <FloatingParticles/>
+      {cantAfford && (
+        <div style={{position:'fixed',top:80,left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#e17055,#d63031)',color:'white',borderRadius:16,padding:'12px 28px',fontFamily:"'Fredoka One',cursive",fontSize:16,boxShadow:'0 6px 24px rgba(214,48,49,0.5)',zIndex:100,animation:'slideUp 0.4s ease'}}>
+          Need {cantAfford.need} more coins!
+        </div>
+      )}
       <div style={{maxWidth:780,margin:'0 auto',position:'relative',zIndex:5}}>
         <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:20}}>
           <button onClick={onBack} style={{background:'rgba(255,255,255,0.2)',color:'white',border:'none',borderRadius:50,padding:'10px 20px',cursor:'pointer',fontFamily:"'Fredoka One',cursive",fontSize:15,backdropFilter:'blur(10px)'}}>← Lobby</button>
@@ -423,6 +454,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
     lives: 3,
     invincible: 0,
     magnetTimer: 0,
+    combo: 0,
     highScore: parseInt(localStorage.getItem('obby_high') || '0'),
   });
   const [displayScore, setDisplayScore] = useState(0);
@@ -469,7 +501,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
       if (g.score > 500 && Math.random() < 0.15) {
         const gapX = CANVAS_W + 20;
         g.obstacles.push({ x: gapX, y: GROUND_Y + 30 - 32, w: 20, h: 32, color: '#a29bfe', isGap: true });
-        g.obstacles.push({ x: gapX, y: GROUND_Y + 30 - 110, w: 20, h: 42, color: '#a29bfe', isGap: true });
+        g.obstacles.push({ x: gapX, y: GROUND_Y + 30 - 110, w: 20, h: 26, color: '#a29bfe', isGap: true });
         if (Math.random() > 0.3) g.coins.push({ x: gapX + 2, y: GROUND_Y + 30 - 72, w: 16, h: 16, collected: false });
         return;
       }
@@ -584,6 +616,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
             }
             // Side/bottom hit — lose a life (if not invincible)
             if (g.invincible > 0) continue;
+            g.combo = 0;
             g.lives--;
             setDisplayLives(g.lives);
             playObbySound(getAudioCtx(), 'hit');
@@ -618,7 +651,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
               }
               const earned = g.coinsCollected;
               if (earned > 0) setCoins(c => c + earned);
-              const xpEarned = Math.floor(g.score / 100);
+              const xpEarned = Math.floor(g.score / 50);
               if (xpEarned > 0) setXp(x => x + xpEarned);
             } else {
               // Still alive — brief invincibility (90 frames = 1.5 sec) + bounce up
@@ -638,7 +671,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
             if (c.isMagnet) {
               g.magnetTimer = 300; // 5 seconds at 60fps
               setMagnetActive(true);
-              playObbySound(getAudioCtx(), 'coin');
+              playObbySound(getAudioCtx(), 'magnet');
               for (let i = 0; i < 10; i++) {
                 g.particles.push({ x: c.x+9, y: c.y+9, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, life:25, color:['#74b9ff','#00cec9','#a29bfe'][Math.floor(Math.random()*3)], size:3+Math.random()*4 });
               }
@@ -646,6 +679,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
               // Heart pickup — restore a life
               g.lives = Math.min(3, g.lives + 1);
               setDisplayLives(g.lives);
+              playObbySound(getAudioCtx(), 'heart');
               for (let i = 0; i < 8; i++) {
                 g.particles.push({
                   x: c.x + 9, y: c.y + 9,
@@ -654,8 +688,9 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
                 });
               }
             } else {
-              g.coinsCollected++;
-              playObbySound(getAudioCtx(), 'coin');
+              g.combo++;
+              g.coinsCollected += 1 + Math.floor(g.combo / 5);
+              playObbySound(getAudioCtx(), 'coin', g.combo);
               // Sparkle
               for (let i = 0; i < 6; i++) {
                 g.particles.push({
@@ -867,6 +902,16 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
       const heartsStr = '❤️'.repeat(g.lives) + '🖤'.repeat(Math.max(0, 3 - g.lives));
       ctx.fillText(heartsStr, 150, 26);
 
+      // Combo display
+      if (g.combo > 1) {
+        const comboColor = g.combo >= 8 ? '#FF4757' : g.combo >= 5 ? '#FFA500' : g.combo >= 3 ? '#FDCB6E' : 'white';
+        ctx.fillStyle = comboColor;
+        ctx.font = `bold ${14 + Math.min(g.combo, 10)}px 'Fredoka One', sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.fillText(`x${g.combo}`, CANVAS_W - 16, 26);
+        ctx.textAlign = 'left';
+      }
+
       if (g.score > 0 && g.highScore > 0) {
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
         ctx.font = "10px sans-serif";
@@ -885,6 +930,11 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
         ctx.fillText('Tap or press Space to jump', CANVAS_W / 2, CANVAS_H / 2 + 15);
         ctx.fillStyle = '#FDCB6E';
         ctx.fillText('Collect coins 🪙 • Dodge blocks!', CANVAS_W / 2, CANVAS_H / 2 + 40);
+        if (g.highScore > 0) {
+          ctx.fillStyle = '#a29bfe';
+          ctx.font = "bold 15px 'Fredoka One', sans-serif";
+          ctx.fillText(`Your Best: ${g.highScore}`, CANVAS_W / 2, CANVAS_H / 2 + 65);
+        }
       }
 
       // Game Over overlay
@@ -925,7 +975,7 @@ function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
       g.obstacles = []; g.particles = []; g.coins = [];
       g.score = 0; g.coinsCollected = 0; g.speed = 3.5;
       g.frame = 0; g.gameOver = false; g.started = true;
-      g.lives = 3; g.invincible = 0; g.magnetTimer = 0;
+      g.lives = 3; g.invincible = 0; g.magnetTimer = 0; g.combo = 0;
       setGameOver(false); setStarted(true);
       setDisplayScore(0); setDisplayCoins(0); setDisplayLives(3);
     } else {
@@ -1059,6 +1109,7 @@ function BeatSandbox({ onBack, coins, setCoins, setXp }) {
   const [currentStep, setCurrentStep] = useState(-1);
   const [bpm, setBpm] = useState(120);
   const [coinToast, setCoinToast] = useState(0);
+  const gridRef = useRef(grid);
   const audioCtxRef = useRef(null);
   const intervalRef = useRef(null);
   const stepRef = useRef(0);
@@ -1070,19 +1121,16 @@ function BeatSandbox({ onBack, coins, setCoins, setXp }) {
     return audioCtxRef.current;
   };
 
-  useEffect(() => { localStorage.setItem('beat_sandbox_grid', JSON.stringify(grid)); }, [grid]);
+  useEffect(() => { gridRef.current = grid; localStorage.setItem('beat_sandbox_grid', JSON.stringify(grid)); }, [grid]);
 
   const toggleCell = (row, col) => {
+    const wasOn = grid[row][col];
     setGrid(prev => {
       const next = prev.map(r => [...r]);
       next[row][col] = !next[row][col];
-      if (!next[row][col] === false) {
-        // Play sound on toggle-on
-        playSound(getAudioCtx(), INSTRUMENTS[row]);
-      }
       return next;
     });
-    playSound(getAudioCtx(), INSTRUMENTS[row]);
+    if (!wasOn) playSound(getAudioCtx(), INSTRUMENTS[row]);
   };
 
   const startStop = () => {
@@ -1098,7 +1146,7 @@ function BeatSandbox({ onBack, coins, setCoins, setXp }) {
       }
       // Award XP for playback time
       const playSeconds = (Date.now() - playStartRef.current) / 1000;
-      const xpEarned = Math.floor(playSeconds / 30);
+      const xpEarned = Math.min(Math.floor(playSeconds / 15), 10);
       if (xpEarned > 0) setXp(x => x + xpEarned);
       stepRef.current = 0;
       loopsRef.current = 0;
@@ -1114,7 +1162,7 @@ function BeatSandbox({ onBack, coins, setCoins, setXp }) {
       intervalRef.current = setInterval(() => {
         const s = stepRef.current;
         setCurrentStep(s);
-        grid.forEach((row, i) => {
+        gridRef.current.forEach((row, i) => {
           if (row[s]) playSound(ctx, INSTRUMENTS[i]);
         });
         stepRef.current = (s + 1) % STEPS;
@@ -1134,7 +1182,7 @@ function BeatSandbox({ onBack, coins, setCoins, setXp }) {
       intervalRef.current = setInterval(() => {
         const s = stepRef.current;
         setCurrentStep(s);
-        grid.forEach((row, i) => {
+        gridRef.current.forEach((row, i) => {
           if (row[s]) playSound(ctx, INSTRUMENTS[i]);
         });
         stepRef.current = (s + 1) % STEPS;
@@ -1236,6 +1284,7 @@ function BeatSandbox({ onBack, coins, setCoins, setXp }) {
         <div style={{display:'flex',justifyContent:'center',gap:24,marginTop:12,color:'rgba(255,255,255,0.4)',fontSize:11}}>
           <span>{activeCount} beats placed</span>
           <span>{bpm} BPM • {(60/bpm*4).toFixed(1)}s loop</span>
+          {(() => { const insts = grid.reduce((c, row) => row.some(Boolean) ? c + 1 : c, 0); return insts > 0 ? <span style={{color:'#FDCB6E'}}>🪙 {insts} instruments = {Math.min(insts * 2, 20)} coins</span> : null; })()}
         </div>
 
         {/* Tips */}
@@ -1309,7 +1358,7 @@ export default function BlockVerse() {
   useEffect(() => {
     const newLevel = getLevel(xp);
     if (newLevel > prevLevelRef.current) {
-      setCoins(c => c + 15);
+      setCoins(c => c + newLevel * 10);
       setLevelUpToast(newLevel);
       setTimeout(() => setLevelUpToast(0), 3000);
     }
@@ -1391,7 +1440,7 @@ export default function BlockVerse() {
           </div>
           <div style={{textAlign:'center',marginBottom:20,fontFamily:"'Fredoka One',cursive",fontSize:24,color:'white',textShadow:'0 2px 12px rgba(0,0,0,0.4)',animation:'slideUp 0.7s 0.1s ease both',opacity:0,animationFillMode:'forwards'}}>🎮 Choose Your Game World</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))',gap:16,animation:'slideUp 0.7s 0.2s ease both',opacity:0,animationFillMode:'forwards'}}>
-            {GAMES.map(game => <GameCard key={game.id} game={game} onPlay={() => setScreen(game.id)}/>)}
+            {GAMES.filter(g => ['obby','sandbox','mining'].includes(g.id)).map(game => <GameCard key={game.id} game={game} onPlay={() => setScreen(game.id)}/>)}
           </div>
           <div style={{marginTop:28,background:'rgba(255,255,255,0.1)',backdropFilter:'blur(12px)',borderRadius:18,padding:'16px 24px',border:'2px dashed rgba(255,255,255,0.3)',display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',justifyContent:'center',animation:'slideUp 0.7s 0.3s ease both',opacity:0,animationFillMode:'forwards'}}>
             <MusicBars count={5} color="rgba(255,255,255,0.8)" height={24}/>
@@ -1406,7 +1455,7 @@ export default function BlockVerse() {
       )}
       {levelUpToast > 0 && (
         <div style={{position:'fixed',top:dailyToast?140:80,left:'50%',transform:'translateX(-50%)',background:'linear-gradient(135deg,#6C5CE7,#FD79A8)',color:'white',borderRadius:16,padding:'14px 32px',fontFamily:"'Fredoka One',cursive",fontSize:18,boxShadow:'0 6px 24px rgba(108,92,231,0.5)',zIndex:100,animation:'slideUp 0.4s ease'}}>
-          🎉 Level Up! Level {levelUpToast} {getLevelTitle(levelUpToast)} +15 coins
+          🎉 Level Up! Level {levelUpToast} {getLevelTitle(levelUpToast)} +{levelUpToast * 10} coins
         </div>
       )}
       </div>

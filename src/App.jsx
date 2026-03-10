@@ -413,6 +413,28 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
         const px = g.player.x + 6, py = g.player.y + 4, pw = 28, ph = 36;
         for (const o of g.obstacles) {
           if (px < o.x + o.w && px + pw > o.x && py < o.y + o.h && py + ph > o.y) {
+            // Landing on top? (player's feet near top of obstacle + falling down)
+            const playerBottom = py + ph;
+            const landingThreshold = o.y + 10; // generous top zone
+            if (playerBottom <= landingThreshold && g.player.vy >= 0) {
+              // Land on top — ride the obstacle
+              g.player.y = o.y - ph + 4;
+              g.player.vy = 0;
+              g.player.grounded = true;
+              g.player.jumping = false;
+              // Bonus points for landing on top
+              g.score += 25;
+              // Sparkle effect
+              for (let i = 0; i < 4; i++) {
+                g.particles.push({
+                  x: px + pw / 2, y: o.y,
+                  vx: (Math.random() - 0.5) * 4, vy: -Math.random() * 3,
+                  life: 15, color: '#a3e635', size: 3 + Math.random() * 3,
+                });
+              }
+              continue;
+            }
+            // Side/bottom hit — game over
             g.gameOver = true;
             setGameOver(true);
             // Spawn crash particles
@@ -697,6 +719,278 @@ function ObbyRush({ avatar, onBack, coins, setCoins }) {
   );
 }
 
+// ─── BEAT SANDBOX ─────────────────────────────────────────────────────────────
+const INSTRUMENTS = [
+  { id: 'kick',    label: '🥁', name: 'Kick',    freq: 80,  type: 'kick',    color: '#FF6B6B' },
+  { id: 'snare',   label: '🪘', name: 'Snare',   freq: 200, type: 'snare',   color: '#FDCB6E' },
+  { id: 'hihat',   label: '🔔', name: 'Hi-Hat',  freq: 800, type: 'hihat',   color: '#6C5CE7' },
+  { id: 'bass',    label: '🎸', name: 'Bass',    freq: 110, type: 'bass',    color: '#00b894' },
+  { id: 'synth1',  label: '🎹', name: 'Synth C', freq: 262, type: 'synth',   color: '#e17055' },
+  { id: 'synth2',  label: '🎵', name: 'Synth E', freq: 330, type: 'synth',   color: '#FD79A8' },
+  { id: 'synth3',  label: '🎶', name: 'Synth G', freq: 392, type: 'synth',   color: '#74b9ff' },
+  { id: 'clap',    label: '👏', name: 'Clap',    freq: 400, type: 'clap',    color: '#a29bfe' },
+];
+
+const STEPS = 16;
+const BPM_OPTIONS = [80, 100, 120, 140, 160];
+
+function playSound(audioCtx, instrument) {
+  const t = audioCtx.currentTime;
+  const { freq, type } = instrument;
+
+  if (type === 'kick') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+    gain.gain.setValueAtTime(0.8, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+    osc.start(t); osc.stop(t + 0.2);
+  } else if (type === 'snare') {
+    const noise = audioCtx.createBufferSource();
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.1, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'highpass'; filter.frequency.value = 1000;
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0.6, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    noise.start(t); noise.stop(t + 0.1);
+  } else if (type === 'hihat') {
+    const noise = audioCtx.createBufferSource();
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.05, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'highpass'; filter.frequency.value = 5000;
+    noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05);
+    noise.start(t); noise.stop(t + 0.05);
+  } else if (type === 'clap') {
+    for (let c = 0; c < 3; c++) {
+      const noise = audioCtx.createBufferSource();
+      const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.02, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      noise.buffer = buf;
+      const gain = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass'; filter.frequency.value = 2000;
+      noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0.4, t + c * 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + c * 0.015 + 0.04);
+      noise.start(t + c * 0.015); noise.stop(t + c * 0.015 + 0.04);
+    }
+  } else if (type === 'bass') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.4, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+    osc.start(t); osc.stop(t + 0.25);
+  } else if (type === 'synth') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.setValueAtTime(0.2, t + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+    osc.start(t); osc.stop(t + 0.2);
+  }
+}
+
+function BeatSandbox({ onBack, coins, setCoins }) {
+  const [grid, setGrid] = useState(() => {
+    const saved = localStorage.getItem('beat_sandbox_grid');
+    if (saved) try { return JSON.parse(saved); } catch {}
+    return INSTRUMENTS.map(() => new Array(STEPS).fill(false));
+  });
+  const [playing, setPlaying] = useState(false);
+  const [currentStep, setCurrentStep] = useState(-1);
+  const [bpm, setBpm] = useState(120);
+  const audioCtxRef = useRef(null);
+  const intervalRef = useRef(null);
+  const stepRef = useRef(0);
+
+  const getAudioCtx = () => {
+    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtxRef.current;
+  };
+
+  useEffect(() => { localStorage.setItem('beat_sandbox_grid', JSON.stringify(grid)); }, [grid]);
+
+  const toggleCell = (row, col) => {
+    setGrid(prev => {
+      const next = prev.map(r => [...r]);
+      next[row][col] = !next[row][col];
+      if (!next[row][col] === false) {
+        // Play sound on toggle-on
+        playSound(getAudioCtx(), INSTRUMENTS[row]);
+      }
+      return next;
+    });
+    playSound(getAudioCtx(), INSTRUMENTS[row]);
+  };
+
+  const startStop = () => {
+    if (playing) {
+      clearInterval(intervalRef.current);
+      setPlaying(false);
+      setCurrentStep(-1);
+      stepRef.current = 0;
+    } else {
+      const ctx = getAudioCtx();
+      if (ctx.state === 'suspended') ctx.resume();
+      stepRef.current = 0;
+      setPlaying(true);
+      setCurrentStep(0);
+      const ms = (60 / bpm / 4) * 1000; // 16th notes
+      intervalRef.current = setInterval(() => {
+        const s = stepRef.current;
+        setCurrentStep(s);
+        grid.forEach((row, i) => {
+          if (row[s]) playSound(ctx, INSTRUMENTS[i]);
+        });
+        stepRef.current = (s + 1) % STEPS;
+      }, ms);
+    }
+  };
+
+  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
+
+  // Restart interval when BPM changes while playing
+  useEffect(() => {
+    if (playing) {
+      clearInterval(intervalRef.current);
+      const ctx = getAudioCtx();
+      const ms = (60 / bpm / 4) * 1000;
+      intervalRef.current = setInterval(() => {
+        const s = stepRef.current;
+        setCurrentStep(s);
+        grid.forEach((row, i) => {
+          if (row[s]) playSound(ctx, INSTRUMENTS[i]);
+        });
+        stepRef.current = (s + 1) % STEPS;
+      }, ms);
+    }
+  }, [bpm]);
+
+  const clearGrid = () => {
+    setGrid(INSTRUMENTS.map(() => new Array(STEPS).fill(false)));
+  };
+
+  const randomize = () => {
+    setGrid(INSTRUMENTS.map((inst) => {
+      const density = inst.type === 'kick' ? 0.25 : inst.type === 'snare' ? 0.15 : inst.type === 'hihat' ? 0.4 : 0.12;
+      return new Array(STEPS).fill(false).map(() => Math.random() < density);
+    }));
+  };
+
+  const activeCount = grid.flat().filter(Boolean).length;
+
+  return (
+    <div style={{minHeight:'100vh',background:'linear-gradient(160deg,#1a0533,#2D1B69,#6C5CE7)',display:'flex',flexDirection:'column',alignItems:'center',padding:'20px 10px',fontFamily:'Nunito,sans-serif',position:'relative',overflow:'hidden'}}>
+      <FloatingParticles/>
+      <div style={{position:'relative',zIndex:5,width:'100%',maxWidth:700}}>
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+          <button onClick={onBack} style={{background:'rgba(255,255,255,0.2)',color:'white',border:'none',borderRadius:50,padding:'8px 18px',cursor:'pointer',fontFamily:"'Fredoka One',cursive",fontSize:14,backdropFilter:'blur(10px)'}}>← Lobby</button>
+          <div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:'white'}}>🎵 Beat Sandbox</div>
+          <div style={{background:'linear-gradient(135deg,#FFD700,#FFA500)',color:'white',borderRadius:50,padding:'6px 14px',fontFamily:"'Fredoka One',cursive",fontSize:14}}>🪙 {coins}</div>
+        </div>
+
+        {/* Controls */}
+        <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',justifyContent:'center'}}>
+          <button onClick={startStop} style={{
+            background: playing ? 'linear-gradient(135deg,#FF6B6B,#ee5a24)' : 'linear-gradient(135deg,#00b894,#00cec9)',
+            color:'white',border:'none',borderRadius:12,padding:'10px 24px',cursor:'pointer',
+            fontFamily:"'Fredoka One',cursive",fontSize:16,
+            boxShadow: playing ? '0 4px 15px rgba(255,107,107,0.4)' : '0 4px 15px rgba(0,184,148,0.4)',
+          }}>
+            {playing ? '⏹ Stop' : '▶ Play'}
+          </button>
+          <div style={{display:'flex',alignItems:'center',gap:6,background:'rgba(255,255,255,0.1)',borderRadius:12,padding:'6px 12px'}}>
+            <span style={{color:'white',fontSize:12,fontFamily:"'Fredoka One',cursive"}}>BPM</span>
+            {BPM_OPTIONS.map(b => (
+              <button key={b} onClick={() => setBpm(b)} style={{
+                background: bpm === b ? '#6C5CE7' : 'rgba(255,255,255,0.1)',
+                color:'white',border:'none',borderRadius:8,padding:'4px 10px',cursor:'pointer',fontSize:12,
+                fontWeight: bpm === b ? 'bold' : 'normal',
+              }}>{b}</button>
+            ))}
+          </div>
+          <button onClick={randomize} style={{background:'rgba(253,203,110,0.3)',color:'#FDCB6E',border:'1px solid rgba(253,203,110,0.4)',borderRadius:12,padding:'8px 16px',cursor:'pointer',fontSize:13,fontFamily:"'Fredoka One',cursive"}}>🎲 Random</button>
+          <button onClick={clearGrid} style={{background:'rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)',border:'none',borderRadius:12,padding:'8px 16px',cursor:'pointer',fontSize:13}}>🗑 Clear</button>
+        </div>
+
+        {/* Grid */}
+        <div style={{background:'rgba(0,0,0,0.3)',borderRadius:16,padding:12,backdropFilter:'blur(10px)',border:'1px solid rgba(255,255,255,0.1)',overflowX:'auto'}}>
+          {/* Step numbers */}
+          <div style={{display:'flex',marginLeft:72,marginBottom:4}}>
+            {Array.from({length:STEPS}).map((_,i) => (
+              <div key={i} style={{
+                width:32,minWidth:32,textAlign:'center',fontSize:9,
+                color: currentStep === i ? '#FDCB6E' : 'rgba(255,255,255,0.25)',
+                fontWeight: currentStep === i ? 'bold' : 'normal',
+                fontFamily:"'Fredoka One',cursive",
+              }}>{i+1}</div>
+            ))}
+          </div>
+
+          {INSTRUMENTS.map((inst, row) => (
+            <div key={inst.id} style={{display:'flex',alignItems:'center',marginBottom:3}}>
+              <div style={{width:70,minWidth:70,display:'flex',alignItems:'center',gap:4}}>
+                <span style={{fontSize:16}}>{inst.label}</span>
+                <span style={{fontSize:10,color:inst.color,fontFamily:"'Fredoka One',cursive"}}>{inst.name}</span>
+              </div>
+              {grid[row].map((on, col) => {
+                const isCurrentStep = currentStep === col;
+                const isBeat = col % 4 === 0;
+                return (
+                  <div key={col} onClick={() => toggleCell(row, col)} style={{
+                    width:30,height:28,minWidth:30,margin:1,borderRadius:5,cursor:'pointer',
+                    background: on
+                      ? `linear-gradient(135deg, ${inst.color}, ${inst.color}99)`
+                      : isBeat ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
+                    border: isCurrentStep
+                      ? '2px solid #FDCB6E'
+                      : on ? `1px solid ${inst.color}` : '1px solid rgba(255,255,255,0.06)',
+                    boxShadow: on && isCurrentStep ? `0 0 12px ${inst.color}80` : on ? `0 0 6px ${inst.color}40` : 'none',
+                    transition: 'all 0.05s',
+                    transform: on && isCurrentStep ? 'scale(1.15)' : 'scale(1)',
+                  }} />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* Stats */}
+        <div style={{display:'flex',justifyContent:'center',gap:24,marginTop:12,color:'rgba(255,255,255,0.4)',fontSize:11}}>
+          <span>{activeCount} beats placed</span>
+          <span>{bpm} BPM • {(60/bpm*4).toFixed(1)}s loop</span>
+        </div>
+
+        {/* Tips */}
+        <div style={{textAlign:'center',marginTop:16,color:'rgba(255,255,255,0.3)',fontSize:12}}>
+          Tap squares to add beats • Hit Play to hear your creation • Try Random for inspiration!
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 const SAVE_KEY = 'blockverse_save';
 
@@ -733,6 +1027,7 @@ export default function BlockVerse() {
   const currentGame = GAMES.find(g => g.id === screen);
   if (screen === 'customizer') return <Customizer av={avatar} setAv={setAvatar} coins={coins} setCoins={setCoins} onBack={() => setScreen('lobby')} owned={owned} setOwned={setOwned}/>;
   if (screen === 'obby') return <ObbyRush avatar={avatar} onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins}/>;
+  if (screen === 'beats') return <BeatSandbox onBack={() => setScreen('lobby')} coins={coins} setCoins={setCoins}/>;
   if (currentGame) return <ComingSoon game={currentGame} onBack={() => setScreen('lobby')}/>;
 
   return (

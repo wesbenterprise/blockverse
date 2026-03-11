@@ -72,7 +72,8 @@ function lightenColor(hex, factor) {
 function createInitialState() {
   return {
     phase: 'start', // 'start' | 'playing' | 'collapsed' | 'results'
-    depth: 1,
+    depth: 0,
+    currentLayer: 1,
     oreIndex: 0,
     ores: generateLayer(1),
     bpm: 100,
@@ -92,7 +93,6 @@ function createInitialState() {
     scrollStart: 0,
     particles: [],
     beatPulse: 0, // 0-1 for pickaxe animation
-    lastTapTime: 0,
     missedBeatCount: 0, // beats since last action on current ore
     wallCracks: [],
   };
@@ -106,7 +106,7 @@ export default function CrystalMine({ onBack, coins, setCoins, setXp }) {
   const animRef = useRef(null);
   const [phase, setPhase] = useState('start');
   const [displayCoins, setDisplayCoins] = useState(0);
-  const [displayDepth, setDisplayDepth] = useState(1);
+  const collapseTimeoutRef = useRef(null);
 
   // Handle tap/click on canvas
   const handleInput = useCallback((clientX, clientY) => {
@@ -165,6 +165,7 @@ export default function CrystalMine({ onBack, coins, setCoins, setXp }) {
     // Check if tapped the correct column
     if (tappedCol !== currentOre.col) {
       // Wrong column = miss
+      g.wrongTapFlash = { col: tappedCol, timer: 15 };
       registerMiss(g, now);
       return;
     }
@@ -264,15 +265,15 @@ export default function CrystalMine({ onBack, coins, setCoins, setXp }) {
     // Advance to next ore
     g.oreIndex++;
     if (g.oreIndex >= CM.ORES_PER_LAYER) {
-      // Next layer
+      // Completed a full layer
       g.depth++;
+      g.currentLayer++;
       g.oreIndex = 0;
-      g.bpm = getBpmForLayer(g.depth);
-      g.ores = generateLayer(g.depth);
+      g.bpm = getBpmForLayer(g.currentLayer);
+      g.ores = generateLayer(g.currentLayer);
     }
 
     setDisplayCoins(g.coinsEarned);
-    setDisplayDepth(g.depth);
   }
 
   function triggerCollapse(g, now) {
@@ -299,24 +300,25 @@ export default function CrystalMine({ onBack, coins, setCoins, setXp }) {
     }
 
     // Save best depth
-    if (g.depth > g.bestDepth) {
-      g.bestDepth = g.depth;
-      localStorage.setItem(CM.HIGH_SCORE_KEY, g.depth.toString());
+    if (g.currentLayer > g.bestDepth) {
+      g.bestDepth = g.currentLayer;
+      localStorage.setItem(CM.HIGH_SCORE_KEY, g.currentLayer.toString());
     }
 
     // Award coins and XP
     if (g.coinsEarned > 0) setCoins(c => c + g.coinsEarned);
-    const xpEarned = Math.floor(g.depth / 2);
+    const xpEarned = Math.floor(g.currentLayer / 2);
     if (xpEarned > 0) setXp(x => x + xpEarned);
 
     // Transition to results after collapse animation
-    setTimeout(() => {
+    collapseTimeoutRef.current = setTimeout(() => {
       const gg = gameRef.current;
       if (gg.phase === 'collapsed') {
         gg.phase = 'results';
         setPhase('results');
         playCrystalMineSound('coin_jingle');
       }
+      collapseTimeoutRef.current = null;
     }, 1200);
 
     setPhase('collapsed');
@@ -414,6 +416,12 @@ export default function CrystalMine({ onBack, coins, setCoins, setXp }) {
         return true;
       });
 
+      // Update wrong tap flash
+      if (g.wrongTapFlash && g.wrongTapFlash.timer > 0) {
+        g.wrongTapFlash.timer--;
+        if (g.wrongTapFlash.timer <= 0) g.wrongTapFlash = null;
+      }
+
       // Update scroll animation
       if (g.scrollAnim > 0) {
         const elapsed = timestamp - g.scrollStart;
@@ -427,16 +435,22 @@ export default function CrystalMine({ onBack, coins, setCoins, setXp }) {
     };
 
     animRef.current = requestAnimationFrame(loop);
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (collapseTimeoutRef.current) clearTimeout(collapseTimeoutRef.current);
+    };
   }, []);
 
   const handleRestart = () => {
+    if (collapseTimeoutRef.current) {
+      clearTimeout(collapseTimeoutRef.current);
+      collapseTimeoutRef.current = null;
+    }
     const newState = createInitialState();
     newState.bestDepth = gameRef.current.bestDepth;
     Object.assign(gameRef.current, newState);
     setPhase('start');
     setDisplayCoins(0);
-    setDisplayDepth(1);
   };
 
   const handleCanvasClick = (e) => {
@@ -599,7 +613,7 @@ function drawFrame(ctx, g, timestamp) {
   ctx.fillStyle = CM.DEPTH_TEXT_COLOR;
   ctx.font = "bold 14px 'Fredoka One', sans-serif";
   ctx.textAlign = 'right';
-  ctx.fillText(`DEPTH: ${g.depth}`, CM.CANVAS_W - 12, 28);
+  ctx.fillText(`DEPTH: ${g.currentLayer}`, CM.CANVAS_W - 12, 28);
 
   // Streak display
   if (g.streak > 1) {
@@ -713,9 +727,9 @@ function drawFrame(ctx, g, timestamp) {
     // Depth reached
     ctx.fillStyle = CM.DEPTH_TEXT_COLOR;
     ctx.font = "bold 18px 'Fredoka One', sans-serif";
-    ctx.fillText(`Depth: Layer ${g.depth}`, CM.CANVAS_W / 2, 85);
+    ctx.fillText(`Depth: Layer ${g.currentLayer}`, CM.CANVAS_W / 2, 85);
 
-    if (g.depth >= g.bestDepth && g.depth > 0) {
+    if (g.currentLayer >= g.bestDepth && g.currentLayer > 0) {
       ctx.fillStyle = '#FDCB6E';
       ctx.font = "bold 14px sans-serif";
       ctx.fillText('NEW PERSONAL BEST!', CM.CANVAS_W / 2, 108);
@@ -728,7 +742,7 @@ function drawFrame(ctx, g, timestamp) {
 
     // XP earned
     ctx.fillStyle = CM.XP_BAR_FILL;
-    ctx.fillText(`+${Math.floor(g.depth / 2)} XP`, CM.CANVAS_W / 2, 165);
+    ctx.fillText(`+${Math.floor(g.currentLayer / 2)} XP`, CM.CANVAS_W / 2, 165);
 
     // Best streak
     if (g.bestStreak > 0) {
@@ -794,7 +808,7 @@ function drawOreGrid(ctx, g, timestamp) {
   }
 
   // Scroll offset for animation
-  const scrollOffset = g.scrollAnim * CM.BLOCK_SIZE * 0.5;
+  const scrollOffset = g.scrollAnim * (CM.BLOCK_SIZE + CM.BLOCK_GAP);
 
   for (const { ore, rowOffset, index } of visibleOres) {
     if (ore.mined && index < g.oreIndex) continue; // Don't draw already-mined past ores
@@ -851,6 +865,13 @@ function drawOreGrid(ctx, g, timestamp) {
     // Dim non-target ores
     if (!isTarget) {
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(bx, by, CM.BLOCK_SIZE, CM.BLOCK_SIZE);
+    }
+
+    // Red flash on wrong-block tap
+    if (g.wrongTapFlash && g.wrongTapFlash.col === col && g.wrongTapFlash.timer > 0) {
+      const flashAlpha = g.wrongTapFlash.timer / 15;
+      ctx.fillStyle = `rgba(255,0,0,${flashAlpha * 0.5})`;
       ctx.fillRect(bx, by, CM.BLOCK_SIZE, CM.BLOCK_SIZE);
     }
   }

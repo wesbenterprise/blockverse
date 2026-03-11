@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import FloatingParticles from './FloatingParticles.jsx';
 import { OBBY } from '../utils/constants.js';
-import { playObbySound } from '../utils/audio.js';
+import { playObbySound, resumeAudioCtx } from '../utils/audio.js';
 
 const {
   GRAVITY, JUMP_FORCE, GROUND_Y, CANVAS_W, CANVAS_H, BASE_SPEED,
@@ -47,12 +47,21 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
   const [displayLives, setDisplayLives] = useState(INITIAL_LIVES);
   const [gameOver, setGameOver] = useState(false);
   const [started, setStarted] = useState(false);
-  const [magnetActive, setMagnetActive] = useState(false);
   const animRef = useRef(null);
+  const avatarRef = useRef(avatar);
+  const landedOnRef = useRef(new Set());
 
   const jump = useCallback(() => {
     const g = gameRef.current;
-    if (g.gameOver) return;
+    resumeAudioCtx();
+    if (g.gameOver) {
+      Object.assign(g, createInitialGameState());
+      g.started = true;
+      landedOnRef.current.clear();
+      setGameOver(false); setStarted(true);
+      setDisplayScore(0); setDisplayCoins(0); setDisplayLives(INITIAL_LIVES);
+      return;
+    }
     if (!g.started) { g.started = true; setStarted(true); }
     if (g.player.grounded) {
       g.player.vy = JUMP_FORCE;
@@ -72,6 +81,8 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [jump]);
+
+  useEffect(() => { avatarRef.current = avatar; }, [avatar]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -163,7 +174,11 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
           o.x -= g.speed;
           if (o.moving) o.y = o.baseY + Math.sin(g.frame * 0.05 + o.movePhase) * 25;
         });
+        const prevLen = g.obstacles.length;
         g.obstacles = g.obstacles.filter(o => o.x + o.w > -20);
+        if (g.obstacles.length < prevLen) {
+          landedOnRef.current.forEach(o => { if (o.x + o.w <= -20) landedOnRef.current.delete(o); });
+        }
 
         // Move coins
         g.coins.forEach(c => { c.x -= g.speed; });
@@ -175,7 +190,6 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
         // Coin magnet effect
         if (g.magnetTimer > 0) {
           g.magnetTimer--;
-          setMagnetActive(g.magnetTimer > 0);
           for (const c of g.coins) {
             if (!c.collected && !c.isHeart && !c.isMagnet) {
               const dist = Math.hypot((c.x + 8) - (g.player.x + 20), (c.y + 8) - (g.player.y + 20));
@@ -204,9 +218,12 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
               g.player.vy = 0;
               g.player.grounded = true;
               g.player.jumping = false;
-              g.score += LANDING_BONUS_SCORE;
-              playObbySound('land');
-              spawnParticles(px + pw / 2, o.y, 4, ['#a3e635'], [3, 6], 4, [15, 15]);
+              if (!landedOnRef.current.has(o)) {
+                landedOnRef.current.add(o);
+                g.score += LANDING_BONUS_SCORE;
+                playObbySound('land');
+                spawnParticles(px + pw / 2, o.y, 4, ['#a3e635'], [3, 6], 4, [15, 15]);
+              }
               continue;
             }
 
@@ -252,7 +269,6 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
             c.collected = true;
             if (c.isMagnet) {
               g.magnetTimer = MAGNET_DURATION_FRAMES;
-              setMagnetActive(true);
               playObbySound('magnet');
               spawnParticles(c.x + 9, c.y + 9, 10, ['#74b9ff', '#00cec9', '#a29bfe'], [3, 7], 6, [25, 25]);
             } else if (c.isHeart) {
@@ -270,8 +286,10 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
         }
 
         g.score++;
-        setDisplayScore(g.score);
-        setDisplayCoins(g.coinsCollected);
+        if (g.frame % 6 === 0) {
+          setDisplayScore(g.score);
+          setDisplayCoins(g.coinsCollected);
+        }
       }
 
       // Update particles
@@ -279,21 +297,21 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
       g.particles = g.particles.filter(p => p.life > 0);
 
       // ─── DRAW ───
-      drawFrame(ctx, g, avatar);
+      drawFrame(ctx, g, avatarRef.current);
 
       animRef.current = requestAnimationFrame(loop);
     };
 
     animRef.current = requestAnimationFrame(loop);
     return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
-  }, [avatar, setCoins, setXp]);
+  }, [setCoins, setXp]);
 
   const handleTap = () => {
     const g = gameRef.current;
     if (g.gameOver) {
-      // Reset
       Object.assign(g, createInitialGameState());
       g.started = true;
+      landedOnRef.current.clear();
       setGameOver(false); setStarted(true);
       setDisplayScore(0); setDisplayCoins(0); setDisplayLives(INITIAL_LIVES);
     } else {

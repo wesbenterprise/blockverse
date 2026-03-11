@@ -5,10 +5,18 @@ import { playSandboxSound, resumeAudioCtx } from '../utils/audio.js';
 
 const { STEPS, BPM_OPTIONS, DEFAULT_BPM, INSTRUMENTS, MAX_COIN_REWARD, COINS_PER_INSTRUMENT, MAX_XP_PER_SESSION, XP_INTERVAL_SECONDS, GRID_SAVE_KEY, RANDOM_DENSITIES } = SANDBOX;
 
+function isValidGrid(g) {
+  return Array.isArray(g) && g.length === INSTRUMENTS.length &&
+    g.every(row => Array.isArray(row) && row.length === STEPS && row.every(v => typeof v === 'boolean'));
+}
+
 function loadSavedGrid() {
   const saved = localStorage.getItem(GRID_SAVE_KEY);
   if (saved) {
-    try { return JSON.parse(saved); } catch { /* fall through */ }
+    try {
+      const parsed = JSON.parse(saved);
+      if (isValidGrid(parsed)) return parsed;
+    } catch { /* fall through */ }
   }
   return INSTRUMENTS.map(() => new Array(STEPS).fill(false));
 }
@@ -42,6 +50,16 @@ export default function BeatSandbox({ onBack, coins, setCoins, setXp }) {
     if (!wasOn) playSandboxSound(INSTRUMENTS[row]);
   };
 
+  const tick = () => {
+    const s = stepRef.current;
+    setCurrentStep(s);
+    gridRef.current.forEach((row, i) => {
+      if (row[s]) playSandboxSound(INSTRUMENTS[i]);
+    });
+    stepRef.current = (s + 1) % STEPS;
+    if (stepRef.current === 0) loopsRef.current++;
+  };
+
   const startPlayback = () => {
     const ctx = resumeAudioCtx();
     stepRef.current = 0;
@@ -49,16 +67,9 @@ export default function BeatSandbox({ onBack, coins, setCoins, setXp }) {
     playStartRef.current = Date.now();
     setPlaying(true);
     setCurrentStep(0);
+    if (intervalRef.current) clearInterval(intervalRef.current);
     const ms = (60 / bpm / 4) * 1000;
-    intervalRef.current = setInterval(() => {
-      const s = stepRef.current;
-      setCurrentStep(s);
-      gridRef.current.forEach((row, i) => {
-        if (row[s]) playSandboxSound(INSTRUMENTS[i]);
-      });
-      stepRef.current = (s + 1) % STEPS;
-      if (stepRef.current === 0) loopsRef.current++;
-    }, ms);
+    intervalRef.current = setInterval(tick, ms);
   };
 
   const stopPlayback = () => {
@@ -68,7 +79,7 @@ export default function BeatSandbox({ onBack, coins, setCoins, setXp }) {
 
     // Award coins if at least one full loop completed
     if (loopsRef.current >= 1) {
-      const uniqueInsts = grid.reduce((c, row) => row.some(Boolean) ? c + 1 : c, 0);
+      const uniqueInsts = gridRef.current.reduce((c, row) => row.some(Boolean) ? c + 1 : c, 0);
       const reward = Math.min(uniqueInsts * COINS_PER_INSTRUMENT, MAX_COIN_REWARD);
       if (reward > 0) {
         setCoins(c => c + reward);
@@ -102,14 +113,7 @@ export default function BeatSandbox({ onBack, coins, setCoins, setXp }) {
     if (playing) {
       clearInterval(intervalRef.current);
       const ms = (60 / bpm / 4) * 1000;
-      intervalRef.current = setInterval(() => {
-        const s = stepRef.current;
-        setCurrentStep(s);
-        gridRef.current.forEach((row, i) => {
-          if (row[s]) playSandboxSound(INSTRUMENTS[i]);
-        });
-        stepRef.current = (s + 1) % STEPS;
-      }, ms);
+      intervalRef.current = setInterval(tick, ms);
     }
   }, [bpm]);
 

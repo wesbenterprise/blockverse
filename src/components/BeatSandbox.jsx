@@ -3,7 +3,7 @@ import FloatingParticles from './FloatingParticles.jsx';
 import { SANDBOX, COIN_TOAST_DURATION_MS } from '../utils/constants.js';
 import { playSandboxSound, resumeAudioCtx } from '../utils/audio.js';
 
-const { STEPS, BPM_OPTIONS, DEFAULT_BPM, INSTRUMENTS, MAX_COIN_REWARD, COINS_PER_INSTRUMENT, MAX_XP_PER_SESSION, XP_INTERVAL_SECONDS, GRID_SAVE_KEY, RANDOM_DENSITIES } = SANDBOX;
+const { STEPS, BPM_OPTIONS, DEFAULT_BPM, INSTRUMENTS, MAX_COIN_REWARD, COINS_PER_INSTRUMENT, MAX_XP_PER_SESSION, XP_INTERVAL_SECONDS, GRID_SAVE_KEY, RANDOM_DENSITIES, MAX_COINS_PER_SESSION, MIN_LOOPS_FOR_REWARD } = SANDBOX;
 
 function isValidGrid(g) {
   return Array.isArray(g) && g.length === INSTRUMENTS.length &&
@@ -32,6 +32,7 @@ export default function BeatSandbox({ onBack, coins, setCoins, setXp }) {
   const stepRef = useRef(0);
   const loopsRef = useRef(0);
   const playStartRef = useRef(0);
+  const sessionCoinsEarnedRef = useRef(0);
 
   // Keep gridRef synced and persist to localStorage
   useEffect(() => {
@@ -77,13 +78,19 @@ export default function BeatSandbox({ onBack, coins, setCoins, setXp }) {
     setPlaying(false);
     setCurrentStep(-1);
 
-    // Award coins if at least one full loop completed
-    if (loopsRef.current >= 1) {
+    // Award coins if at least MIN_LOOPS_FOR_REWARD full loops completed
+    if (loopsRef.current >= MIN_LOOPS_FOR_REWARD) {
       const uniqueInsts = gridRef.current.reduce((c, row) => row.some(Boolean) ? c + 1 : c, 0);
-      const reward = Math.min(uniqueInsts * COINS_PER_INSTRUMENT, MAX_COIN_REWARD);
+      const rawReward = Math.min(uniqueInsts * COINS_PER_INSTRUMENT, MAX_COIN_REWARD);
+      const remaining = MAX_COINS_PER_SESSION - sessionCoinsEarnedRef.current;
+      const reward = Math.min(rawReward, remaining);
       if (reward > 0) {
+        sessionCoinsEarnedRef.current += reward;
         setCoins(c => c + reward);
         setCoinToast(reward);
+        setTimeout(() => setCoinToast(0), COIN_TOAST_DURATION_MS);
+      } else if (rawReward > 0) {
+        setCoinToast(-1);
         setTimeout(() => setCoinToast(0), COIN_TOAST_DURATION_MS);
       }
     }
@@ -248,16 +255,17 @@ export default function BeatSandbox({ onBack, coins, setCoins, setXp }) {
         </div>
 
         {/* Coin reward toast */}
-        {coinToast > 0 && (
+        {coinToast !== 0 && (
           <div style={{
             position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
-            background: 'linear-gradient(135deg,#FFD700,#FFA500)', color: 'white',
+            background: coinToast > 0 ? 'linear-gradient(135deg,#FFD700,#FFA500)' : 'linear-gradient(135deg,#636e72,#b2bec3)',
+            color: 'white',
             borderRadius: 16, padding: '12px 28px',
             fontFamily: "'Fredoka One',cursive", fontSize: 18,
             boxShadow: '0 6px 24px rgba(255,165,0,0.5)', zIndex: 100,
             animation: 'slideUp 0.4s ease',
           }}>
-            🪙 +{coinToast} coins earned!
+            {coinToast > 0 ? `🪙 +${coinToast} coins earned!` : 'Coin limit reached! Play other games to earn more.'}
           </div>
         )}
       </div>

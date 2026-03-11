@@ -124,6 +124,8 @@ export const SANDBOX = {
   COINS_PER_INSTRUMENT: 2,
   MAX_XP_PER_SESSION: 10,
   XP_INTERVAL_SECONDS: 15,
+  MAX_COINS_PER_SESSION: 40,
+  MIN_LOOPS_FOR_REWARD: 2,
   GRID_SAVE_KEY: 'beat_sandbox_grid',
   INSTRUMENTS: [
     { id: 'kick',    label: '🥁', name: 'Kick',    freq: 80,  type: 'kick',    color: '#FF6B6B' },

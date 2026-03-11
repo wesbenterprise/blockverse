@@ -80,6 +80,28 @@ export function playObbySound(type, combo = 0) {
       gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.08 + 0.25);
       osc.start(t + i * 0.08); osc.stop(t + i * 0.08 + 0.3);
     });
+  } else if (type === 'beatJump') {
+    // Ascending chord: C5-E5-G5 played simultaneously
+    [523, 659, 784].forEach((freq) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+      osc.start(t); osc.stop(t + 0.25);
+    });
+  } else if (type === 'checkpoint') {
+    // Triumphant C-E-G ascending arpeggio
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.frequency.setValueAtTime(freq, t + i * 0.1);
+      gain.gain.setValueAtTime(0.2, t + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.1 + 0.35);
+      osc.start(t + i * 0.1); osc.stop(t + i * 0.1 + 0.4);
+    });
   } else if (type === 'magnet') {
     const audioCtxLocal = audioCtx;
     const noise = audioCtxLocal.createBufferSource();
@@ -238,6 +260,21 @@ export function playCrystalMineSound(type, oreType) {
       gain.gain.linearRampToValueAtTime(0.10, t + 0.255);
       gain.gain.linearRampToValueAtTime(0, t + 0.455);
       osc.start(t); osc.stop(t + 0.46);
+    } else if (ore.id === 'echo') {
+      // Full 8-note C major pentatonic phrase: C4-D4-E4-G4-A4-G4-E4-C5
+      const echoNotes = [261.6, 293.7, 329.6, 392.0, 440.0, 392.0, 329.6, 523.3];
+      echoNotes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t + i * 0.1);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0, t + i * 0.1);
+        gain.gain.linearRampToValueAtTime(0.18, t + i * 0.1 + 0.01);
+        gain.gain.linearRampToValueAtTime(0.10, t + i * 0.1 + 0.2);
+        gain.gain.linearRampToValueAtTime(0, t + i * 0.1 + 0.5);
+        osc.start(t + i * 0.1); osc.stop(t + i * 0.1 + 0.51);
+      });
     } else {
       // Standard single oscillator ores
       const configs = {

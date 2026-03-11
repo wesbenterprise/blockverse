@@ -16,6 +16,8 @@ const {
   SPAWN_INTERVAL_REDUCTION_PER_STEP, SPAWN_INTERVAL_SCORE_STEP,
   OBSTACLE_TYPES, PLAYER_HITBOX, LANDING_THRESHOLD,
   COMBO_BONUS_INTERVAL, HIGH_SCORE_KEY, BEAT_FRAMES_PER_BEAT,
+  BEAT_TIMING_WINDOW, CHECKPOINT_SCORE_INTERVAL, CHECKPOINT_COINS,
+  CHECKPOINT_WIDTH, CHECKPOINT_HEIGHT, CHECKPOINT_COLOR,
 } = OBBY;
 
 function createInitialGameState() {
@@ -36,6 +38,10 @@ function createInitialGameState() {
     magnetTimer: 0,
     combo: 0,
     highScore: parseInt(localStorage.getItem(HIGH_SCORE_KEY) || '0'),
+    floatingTexts: [],
+    beatBorderFlash: 0,
+    groundFlash: 0,
+    lastCheckpointScore: 0,
   };
 }
 
@@ -64,10 +70,24 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
     }
     if (!g.started) { g.started = true; setStarted(true); }
     if (g.player.grounded) {
-      g.player.vy = JUMP_FORCE;
+      // On-beat detection: check if jump is within ±BEAT_TIMING_WINDOW frames of beat peak
+      const beatFrame = g.frame % BEAT_FRAMES_PER_BEAT;
+      const isOnBeat = beatFrame <= BEAT_TIMING_WINDOW || beatFrame >= (BEAT_FRAMES_PER_BEAT - BEAT_TIMING_WINDOW);
+
+      if (isOnBeat && g.started && !g.gameOver) {
+        g.player.vy = JUMP_FORCE * 1.2; // 20% stronger
+        playObbySound('beatJump');
+        g.beatBorderFlash = 20;
+        g.floatingTexts.push({
+          x: g.player.x + 20, y: g.player.y - 10,
+          text: '♪ ON BEAT!', color: '#FFD700', life: 45, maxLife: 45,
+        });
+      } else {
+        g.player.vy = JUMP_FORCE;
+        playObbySound('jump');
+      }
       g.player.jumping = true;
       g.player.grounded = false;
-      playObbySound('jump');
     }
   }, []);
 
@@ -160,6 +180,19 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
           g.player.vy = 0;
           g.player.grounded = true;
           g.player.jumping = false;
+        }
+
+        // Rhythm checkpoint at every CHECKPOINT_SCORE_INTERVAL points
+        const checkpointMilestone = Math.floor(g.score / CHECKPOINT_SCORE_INTERVAL) * CHECKPOINT_SCORE_INTERVAL;
+        if (checkpointMilestone > 0 && checkpointMilestone > g.lastCheckpointScore && g.score - checkpointMilestone < 2) {
+          g.lastCheckpointScore = checkpointMilestone;
+          // Spawn checkpoint block instead of normal obstacle
+          g.obstacles.push({
+            x: CANVAS_W + 20,
+            y: GROUND_Y + 30 - CHECKPOINT_HEIGHT,
+            w: CHECKPOINT_WIDTH, h: CHECKPOINT_HEIGHT,
+            color: CHECKPOINT_COLOR, isCheckpoint: true, claimed: false,
+          });
         }
 
         // Spawn obstacles
@@ -258,6 +291,21 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
           }
         }
 
+        // Checkpoint collection — player passes over checkpoint block
+        for (const o of g.obstacles) {
+          if (o.isCheckpoint && !o.claimed && o.x < g.player.x + 40) {
+            o.claimed = true;
+            g.coinsCollected += CHECKPOINT_COINS;
+            playObbySound('checkpoint');
+            g.beatBorderFlash = 30;
+            spawnParticles(o.x + o.w / 2, o.y, 12, ['#FFD700', '#FFA500', '#FDCB6E'], [3, 8], 8, [25, 40]);
+            g.floatingTexts.push({
+              x: o.x + o.w / 2, y: o.y - 20,
+              text: 'CHECKPOINT ♪', color: '#FFD700', life: 60, maxLife: 60,
+            });
+          }
+        }
+
         // Coin & heart collection
         for (const c of g.coins) {
           if (!c.collected &&
@@ -295,6 +343,14 @@ export default function ObbyRush({ avatar, onBack, coins, setCoins, setXp }) {
       // Update particles
       g.particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life--; p.vy += 0.15; });
       g.particles = g.particles.filter(p => p.life > 0);
+
+      // Update floating texts
+      g.floatingTexts.forEach(ft => { ft.life--; ft.y -= 0.8; });
+      g.floatingTexts = g.floatingTexts.filter(ft => ft.life > 0);
+
+      // Tick down beat border flash and ground flash
+      if (g.beatBorderFlash > 0) g.beatBorderFlash--;
+      if (g.groundFlash > 0) g.groundFlash--;
 
       // ─── DRAW ───
       drawFrame(ctx, g, avatarRef.current);
@@ -377,16 +433,20 @@ function drawFrame(ctx, g, avatar) {
     ctx.fillRect(sx, sy, 1.5, 1.5);
   }
 
-  // Beat pulse background bar
-  const beatAlpha = Math.sin(g.beatPhase * Math.PI) * 0.15;
+  // Beat pulse background bar — enhanced: scales height on beat
+  const beatSin = Math.sin(g.beatPhase * Math.PI);
+  const beatAlpha = beatSin * 0.15;
+  const beatBarHeight = 12 + beatSin * 8;
   ctx.fillStyle = `rgba(253,121,168,${beatAlpha})`;
-  ctx.fillRect(0, GROUND_Y + 20, CANVAS_W, 12);
+  ctx.fillRect(0, GROUND_Y + 20 - (beatBarHeight - 12), CANVAS_W, beatBarHeight);
 
-  // Ground
+  // Ground — flash purple on beat peak
   ctx.fillStyle = '#1e1e2e';
   ctx.fillRect(0, GROUND_Y + 30, CANVAS_W, CANVAS_H - GROUND_Y - 30);
-  ctx.fillStyle = '#6C5CE7';
-  ctx.fillRect(0, GROUND_Y + 30, CANVAS_W, 3);
+  const groundBeatPeak = g.beatPhase < 0.15 || g.beatPhase > 0.85;
+  const groundColor = groundBeatPeak ? '#9B59B6' : '#6C5CE7';
+  ctx.fillStyle = groundColor;
+  ctx.fillRect(0, GROUND_Y + 30, CANVAS_W, groundBeatPeak ? 5 : 3);
   ctx.fillStyle = 'rgba(108,92,231,0.2)';
   for (let i = 0; i < 20; i++) {
     const gx = ((i * 32) - (g.frame * g.speed) % 32 + CANVAS_W) % CANVAS_W;
@@ -395,6 +455,19 @@ function drawFrame(ctx, g, avatar) {
 
   // Obstacles
   g.obstacles.forEach(o => {
+    if (o.isCheckpoint) {
+      // Gold checkpoint block with musical note
+      const glow = 0.4 + Math.sin(g.frame * 0.1) * 0.2;
+      ctx.fillStyle = `rgba(255,215,0,${glow})`;
+      ctx.fillRect(o.x - 3, o.y - 3, o.w + 6, o.h + 6);
+      ctx.fillStyle = o.claimed ? '#b8860b' : '#FFD700';
+      ctx.fillRect(o.x, o.y, o.w, o.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillRect(o.x + 2, o.y + 2, o.w - 4, 4);
+      ctx.fillStyle = '#1a0533'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('♪', o.x + o.w / 2, o.y + o.h - 4);
+      return;
+    }
     ctx.fillStyle = o.color;
     ctx.fillRect(o.x, o.y, o.w, o.h);
     ctx.fillStyle = 'rgba(255,255,255,0.2)';
@@ -515,6 +588,25 @@ function drawFrame(ctx, g, avatar) {
     ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
   });
   ctx.globalAlpha = 1;
+
+  // Floating texts
+  g.floatingTexts.forEach(ft => {
+    const alpha = Math.max(0, ft.life / ft.maxLife);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ft.color;
+    ctx.font = "bold 14px 'Fredoka One', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillText(ft.text, ft.x, ft.y);
+  });
+  ctx.globalAlpha = 1;
+
+  // Beat border flash (gold border when on-beat jump or checkpoint)
+  if (g.beatBorderFlash > 0) {
+    const borderAlpha = g.beatBorderFlash / 30;
+    ctx.strokeStyle = `rgba(255,215,0,${borderAlpha})`;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, CANVAS_W - 4, CANVAS_H - 4);
+  }
 
   // HUD
   ctx.fillStyle = 'rgba(0,0,0,0.3)';

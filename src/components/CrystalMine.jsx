@@ -219,12 +219,27 @@ export default function CrystalMine({ onBack, coins, setCoins, setXp }) {
     g.totalOresMined++;
     g.oresMined[ore.type.id] = (g.oresMined[ore.type.id] || 0) + 1;
 
+    const isEcho = ore.type.id === 'echo';
+
+    // Echo Ore first discovery bonus
+    if (isEcho) {
+      const found = localStorage.getItem(CM.ECHO_ORE_DISCOVERY_KEY);
+      if (!found) {
+        localStorage.setItem(CM.ECHO_ORE_DISCOVERY_KEY, '1');
+        g.coinsEarned += 10; // first discovery bonus
+        g.echoDiscovery = { timer: 120 }; // special celebration
+      }
+      g.echoFlash = { timer: 60 }; // gold text for all echo ore
+    }
+
     playCrystalMineSound('ore', ore.type);
 
-    // Spawn break particles
+    // Spawn break particles — double for echo ore
     const blockX = CM.GRID_X_OFFSET + ore.col * (CM.BLOCK_SIZE + CM.BLOCK_GAP) + CM.BLOCK_SIZE / 2;
     const blockY = CM.SHAFT_Y + CM.SHAFT_H / 2;
-    const pCount = CM.ORE_BREAK_PARTICLES.count[0] + Math.floor(Math.random() * (CM.ORE_BREAK_PARTICLES.count[1] - CM.ORE_BREAK_PARTICLES.count[0]));
+    const baseCount = CM.ORE_BREAK_PARTICLES.count[0] + Math.floor(Math.random() * (CM.ORE_BREAK_PARTICLES.count[1] - CM.ORE_BREAK_PARTICLES.count[0]));
+    const pCount = isEcho ? baseCount * 2 : baseCount;
+    const echoColors = ['#9B59B6', '#D4AAFF', '#ffffff', '#FFD700'];
     for (let i = 0; i < pCount; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = CM.ORE_BREAK_PARTICLES.speed[0] + Math.random() * (CM.ORE_BREAK_PARTICLES.speed[1] - CM.ORE_BREAK_PARTICLES.speed[0]);
@@ -233,7 +248,7 @@ export default function CrystalMine({ onBack, coins, setCoins, setXp }) {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         size: CM.ORE_BREAK_PARTICLES.size[0] + Math.random() * (CM.ORE_BREAK_PARTICLES.size[1] - CM.ORE_BREAK_PARTICLES.size[0]),
-        color: Math.random() > 0.3 ? ore.type.color : '#ffffff',
+        color: isEcho ? echoColors[Math.floor(Math.random() * echoColors.length)] : (Math.random() > 0.3 ? ore.type.color : '#ffffff'),
         life: CM.ORE_BREAK_PARTICLES.life[0] + Math.random() * (CM.ORE_BREAK_PARTICLES.life[1] - CM.ORE_BREAK_PARTICLES.life[0]),
         maxLife: CM.ORE_BREAK_PARTICLES.life[1],
         gravity: CM.ORE_BREAK_PARTICLES.gravity,
@@ -655,6 +670,35 @@ function drawFrame(ctx, g, timestamp) {
   }
   ctx.globalAlpha = 1;
 
+  // Echo Ore floating text
+  if (g.echoFlash && g.echoFlash.timer > 0) {
+    g.echoFlash.timer--;
+    const alpha = Math.min(1, g.echoFlash.timer / 30);
+    const yOff = (60 - g.echoFlash.timer) * 0.6;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#FFD700';
+    ctx.font = "bold 18px 'Fredoka One', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2728 ECHO ORE! \u2728', CM.CANVAS_W / 2, CM.SHAFT_Y + CM.SHAFT_H / 2 - 50 - yOff);
+    ctx.globalAlpha = 1;
+  }
+
+  // Echo Ore first discovery celebration
+  if (g.echoDiscovery && g.echoDiscovery.timer > 0) {
+    g.echoDiscovery.timer--;
+    const alpha = Math.min(1, g.echoDiscovery.timer / 40);
+    const yOff = (120 - g.echoDiscovery.timer) * 0.3;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#FFD700';
+    ctx.font = "bold 24px 'Fredoka One', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2728 FIRST ECHO ORE! \u2728', CM.CANVAS_W / 2, CM.SHAFT_Y + CM.SHAFT_H / 2 - 80 - yOff);
+    ctx.fillStyle = '#D4AAFF';
+    ctx.font = "bold 14px 'Fredoka One', sans-serif";
+    ctx.fillText('+10 BONUS COINS!', CM.CANVAS_W / 2, CM.SHAFT_Y + CM.SHAFT_H / 2 - 55 - yOff);
+    ctx.globalAlpha = 1;
+  }
+
   // Danger indicator at 4/5 misses
   if (g.misses >= CM.MAX_MISSES - 1 && g.phase === 'playing') {
     const dangerPulse = Math.sin(timestamp * 0.008) * 0.15 + 0.15;
@@ -851,6 +895,17 @@ function drawOreGrid(ctx, g, timestamp) {
       ctx.translate(cx, cy);
       ctx.rotate(Math.PI / 4);
       ctx.fillRect(-5, -5, 10, 10);
+      ctx.restore();
+    }
+
+    // Echo ore pulsing purple glow
+    if (oreType.id === 'echo') {
+      const echoGlow = 0.3 + Math.sin(timestamp * 0.008) * 0.3;
+      ctx.save();
+      ctx.shadowColor = '#D4AAFF';
+      ctx.shadowBlur = 16 + Math.sin(timestamp * 0.006) * 8;
+      ctx.fillStyle = `rgba(155,89,182,${echoGlow})`;
+      ctx.fillRect(bx - 6, by - 6, CM.BLOCK_SIZE + 12, CM.BLOCK_SIZE + 12);
       ctx.restore();
     }
 

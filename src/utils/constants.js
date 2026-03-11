@@ -113,6 +113,12 @@ export const OBBY = {
   LANDING_THRESHOLD: 10,
   COMBO_BONUS_INTERVAL: 5,
   HIGH_SCORE_KEY: 'obby_high',
+  BEAT_TIMING_WINDOW: 5, // ±5 frames from beat peak for on-beat detection
+  CHECKPOINT_SCORE_INTERVAL: 500,
+  CHECKPOINT_COINS: 15,
+  CHECKPOINT_WIDTH: 60,
+  CHECKPOINT_HEIGHT: 20,
+  CHECKPOINT_COLOR: '#FFD700',
 };
 
 // ─── BEAT SANDBOX CONSTANTS ───────────────────────────────────────────────────
@@ -127,6 +133,8 @@ export const SANDBOX = {
   MAX_COINS_PER_SESSION: 40,
   MIN_LOOPS_FOR_REWARD: 2,
   GRID_SAVE_KEY: 'beat_sandbox_grid',
+  BEAT_SAVES_KEY: 'beat_sandbox_saves',
+  MAX_SAVES: 10,
   INSTRUMENTS: [
     { id: 'kick',    label: '🥁', name: 'Kick',    freq: 80,  type: 'kick',    color: '#FF6B6B' },
     { id: 'snare',   label: '🪘', name: 'Snare',   freq: 200, type: 'snare',   color: '#FDCB6E' },
@@ -202,7 +210,10 @@ export const CRYSTAL_MINE = {
     { id: 'sapphire', name: 'Sapphire', color: '#0f52ba', accent: '#4488ff', coinValue: 10, freq: 524, waveform: 'triangle', minLayer: 15 },
     { id: 'emerald',  name: 'Emerald',  color: '#50c878', accent: '#80ffaa', coinValue: 12, freq: 588, waveform: 'square',   minLayer: 20 },
     { id: 'diamond',  name: 'Diamond',  color: '#b9f2ff', accent: '#ffffff', coinValue: 20, freq: 784, waveform: 'sine',     minLayer: 28 },
+    { id: 'echo',     name: 'Echo Ore', color: '#9B59B6', accent: '#D4AAFF', coinValue: 25, freq: 523, waveform: 'sine',     minLayer: 20 },
   ],
+
+  ECHO_ORE_DISCOVERY_KEY: 'crystal_mine_echo_found',
 
   // BPM by layer range: [maxLayer, bpm] — first match where layer <= maxLayer
   BPM_TABLE: [
@@ -233,8 +244,8 @@ export const CRYSTAL_MINE = {
     [9,  { coal: 20, copper: 25, iron: 30, gold: 25 }],
     [14, { coal: 10, copper: 15, iron: 25, gold: 30, ruby: 20 }],
     [19, { coal: 5, copper: 10, iron: 15, gold: 25, ruby: 25, sapphire: 20 }],
-    [27, { copper: 5, iron: 10, gold: 20, ruby: 25, sapphire: 20, emerald: 20 }],
-    [Infinity, { iron: 5, gold: 15, ruby: 20, sapphire: 20, emerald: 20, diamond: 20 }],
+    [27, { copper: 5, iron: 10, gold: 20, ruby: 25, sapphire: 20, emerald: 19, echo: 1 }],
+    [Infinity, { iron: 5, gold: 15, ruby: 20, sapphire: 20, emerald: 19, diamond: 20, echo: 1 }],
   ],
 
   // Particle settings

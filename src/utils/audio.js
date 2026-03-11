@@ -345,6 +345,158 @@ export function playCrystalMineSound(type, oreType) {
   }
 }
 
+// ─── ECHO TOWERS SFX ────────────────────────────────────────────────────────
+export function playEchoTowersSound(type, params = {}) {
+  const audioCtx = getSharedAudioCtx();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+
+  if (type === 'note') {
+    const freq = params.freq || 261.63;
+    // Triangle wave primary
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, t);
+    filter.type = 'lowpass'; filter.frequency.value = 2000; filter.Q.value = 1.0;
+    osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    // ADSR: 10ms attack, 150ms decay, sustain 0.3, release 400ms
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.35, t + 0.01);
+    gain.gain.linearRampToValueAtTime(0.3 * 0.35, t + 0.01 + 0.15);
+    gain.gain.setValueAtTime(0.3 * 0.35, t + 0.01 + 0.15);
+    gain.gain.linearRampToValueAtTime(0, t + 0.01 + 0.15 + 0.4);
+    osc.start(t); osc.stop(t + 0.57);
+
+    // Sine sub
+    const sub = audioCtx.createOscillator();
+    const subGain = audioCtx.createGain();
+    sub.type = 'sine'; sub.frequency.setValueAtTime(freq, t);
+    sub.connect(subGain); subGain.connect(audioCtx.destination);
+    subGain.gain.setValueAtTime(0, t);
+    subGain.gain.linearRampToValueAtTime(0.12, t + 0.01);
+    subGain.gain.linearRampToValueAtTime(0.04, t + 0.16);
+    subGain.gain.linearRampToValueAtTime(0, t + 0.56);
+    sub.start(t); sub.stop(t + 0.57);
+  } else if (type === 'beatNote') {
+    // Play base note
+    playEchoTowersSound('note', params);
+    const freq = params.freq || 261.63;
+
+    // Square wave ding
+    const ding = audioCtx.createOscillator();
+    const dingGain = audioCtx.createGain();
+    ding.type = 'square'; ding.frequency.setValueAtTime(freq, t);
+    ding.connect(dingGain); dingGain.connect(audioCtx.destination);
+    dingGain.gain.setValueAtTime(0, t);
+    dingGain.gain.linearRampToValueAtTime(0.08, t + 0.05);
+    dingGain.gain.linearRampToValueAtTime(0, t + 0.25);
+    ding.start(t); ding.stop(t + 0.26);
+
+    // Noise shimmer
+    const noise = audioCtx.createBufferSource();
+    const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.09, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noise.buffer = buf;
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 4500; bp.Q.value = 1.5;
+    const nGain = audioCtx.createGain();
+    noise.connect(bp); bp.connect(nGain); nGain.connect(audioCtx.destination);
+    nGain.gain.setValueAtTime(0, t);
+    nGain.gain.linearRampToValueAtTime(0.06, t + 0.005);
+    nGain.gain.linearRampToValueAtTime(0, t + 0.085);
+    noise.start(t); noise.stop(t + 0.09);
+  } else if (type === 'offBeat') {
+    const freq = params.freq || 261.63;
+    // Reduced note
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(freq, t);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.25, t + 0.01);
+    gain.gain.linearRampToValueAtTime(0.15 * 0.25, t + 0.16);
+    gain.gain.linearRampToValueAtTime(0, t + 0.36);
+    osc.start(t); osc.stop(t + 0.37);
+
+    // Low thud
+    const thud = audioCtx.createOscillator();
+    const thudGain = audioCtx.createGain();
+    thud.type = 'sine'; thud.frequency.setValueAtTime(80, t);
+    thud.connect(thudGain); thudGain.connect(audioCtx.destination);
+    thudGain.gain.setValueAtTime(0, t);
+    thudGain.gain.linearRampToValueAtTime(0.15, t + 0.005);
+    thudGain.gain.linearRampToValueAtTime(0, t + 0.105);
+    thud.start(t); thud.stop(t + 0.11);
+  } else if (type === 'echo') {
+    const freq = params.freq || 261.63;
+    // 3-note chord: root, M3 (×5/4), P5 (×3/2)
+    [freq, freq * 5 / 4, freq * 3 / 2].forEach(f => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(f, t);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.25, t + 0.005);
+      gain.gain.linearRampToValueAtTime(0.5 * 0.25, t + 0.105);
+      gain.gain.linearRampToValueAtTime(0, t + 0.905);
+      osc.start(t); osc.stop(t + 0.91);
+    });
+
+    // Ascending 5-note arpeggio pings
+    const arpFreqs = [freq, freq * 9 / 8, freq * 5 / 4, freq * 3 / 2, freq * 2];
+    arpFreqs.forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.setValueAtTime(f, t + i * 0.1);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0, t + i * 0.1);
+      gain.gain.linearRampToValueAtTime(0.15, t + i * 0.1 + 0.005);
+      gain.gain.linearRampToValueAtTime(0, t + i * 0.1 + 0.2);
+      osc.start(t + i * 0.1); osc.stop(t + i * 0.1 + 0.21);
+    });
+  } else if (type === 'metronome') {
+    const beat1 = params.downbeat;
+    const freq = beat1 ? 880 : 660;
+    const vol = beat1 ? 0.08 : 0.04;
+    const release = beat1 ? 0.06 : 0.04;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(freq, t);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + 0.001);
+    gain.gain.linearRampToValueAtTime(0, t + 0.001 + release);
+    osc.start(t); osc.stop(t + 0.001 + release + 0.01);
+  } else if (type === 'playbackNote') {
+    const freq = params.freq || 261.63;
+    // Enhanced note with longer release
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(freq, t);
+    filter.type = 'lowpass'; filter.frequency.value = 2000; filter.Q.value = 1.0;
+    osc.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.45, t + 0.005);
+    gain.gain.linearRampToValueAtTime(0.4 * 0.45, t + 0.205);
+    gain.gain.linearRampToValueAtTime(0, t + 0.805);
+    osc.start(t); osc.stop(t + 0.81);
+
+    // Delay effect (simple echo)
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.type = 'triangle'; osc2.frequency.setValueAtTime(freq, t + 0.12);
+    osc2.connect(gain2); gain2.connect(audioCtx.destination);
+    gain2.gain.setValueAtTime(0, t + 0.12);
+    gain2.gain.linearRampToValueAtTime(0.45 * 0.3, t + 0.125);
+    gain2.gain.linearRampToValueAtTime(0, t + 0.925);
+    osc2.start(t + 0.12); osc2.stop(t + 0.93);
+  }
+}
+
 // ─── PROCEDURAL BACKGROUND MUSIC ─────────────────────────────────────────────
 export function startProceduralMusic() {
   const audioCtx = getSharedAudioCtx();

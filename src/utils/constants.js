@@ -65,6 +65,7 @@ export const GAMES = [
   { id: 'obby',    name: 'Obby Rush',     icon: '🏃', color: '#FF6B6B', bg: '#fff5f5', desc: 'Race & jump to the beat!',    note: '♩', coinReward: '10–30' },
   { id: 'sandbox', name: 'Beat Sandbox',  icon: '🧱', color: '#00CEC9', bg: '#f0fffe', desc: 'Build worlds with music!',     note: '♫', coinReward: '5–20'  },
   { id: 'mining',  name: 'Crystal Mine',  icon: '⛏️', color: '#FDCB6E', bg: '#fffdf0', desc: 'Dig ores to the rhythm!',     note: '♬', coinReward: '15–40' },
+  { id: 'towers',  name: 'Echo Towers',   icon: '🏗️', color: '#F5A623', bg: '#fff8f0', desc: 'Build musical towers!',        note: '🎵', coinReward: '20-60' },
   { id: 'battle',  name: 'Beat Battle',   icon: '⚔️', color: '#6C5CE7', bg: '#f5f0ff', desc: 'Fight in sync with the beat!', note: '🎵', coinReward: '20–60' },
   { id: 'outfit',  name: 'Style Stage',   icon: '👗', color: '#FD79A8', bg: '#fff0f7', desc: 'Design, perform & get ranked!', note: '🎶', coinReward: '25–100'},
 ];
@@ -159,7 +160,7 @@ export const LEVEL_UP_COIN_MULTIPLIER = 10;
 export const STARTING_COINS = 350;
 export const SAVE_KEY = 'blockverse_save';
 export const TOAST_DURATION_MS = 3000;
-export const PLAYABLE_GAME_IDS = ['obby', 'sandbox', 'mining'];
+export const PLAYABLE_GAME_IDS = ['obby', 'sandbox', 'mining', 'towers'];
 export const COIN_TOAST_DURATION_MS = 2500;
 
 // ─── CRYSTAL MINE CONSTANTS ──────────────────────────────────────────────────
@@ -261,6 +262,67 @@ export const CRYSTAL_MINE = {
 
   // Scroll animation
   SCROLL_DURATION_MS: 200,
+};
+
+// ─── ECHO TOWERS CONSTANTS ──────────────────────────────────────────────────
+export const ECHO_TOWERS = {
+  CANVAS_W: 400,
+  CANVAS_H: 700,
+  COLS: 7,
+  ROWS: 12,
+  BLOCK_SIZE: 48,
+  GRID_X_OFFSET: 12, // (400 - 7*48 - 6*4) / 2 ≈ 12
+  GRID_GAP: 4,
+  GROUND_Y: 640,
+  HUD_TOP_H: 60,
+  HIGH_SCORE_KEY: 'echo_towers_best',
+
+  // Column note frequencies (C major pentatonic + 2)
+  NOTE_FREQS: [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33],
+  NOTE_NAMES: ['C', 'D', 'E', 'G', 'A', "C'", "D'"],
+
+  // Octave bands: rows 0-3 = ×1, 4-6 = ×2, 7-9 = ×4, 10-11 = ×8
+  OCTAVE_BANDS: [1, 1, 1, 1, 2, 2, 2, 4, 4, 4, 8, 8],
+
+  // BPM
+  BASE_BPM: 90,
+  BPM_INCREMENT: 5,
+  BPM_BLOCK_INTERVAL: 12,
+
+  // Timing
+  BEAT_WINDOW_MS: 100,
+  ROUND_DURATION: 60,
+
+  // Scoring
+  BASE_POINTS: 10,
+  MULTIPLIER_INCREMENT: 0.25,
+  ECHO_BLOCK_POINTS: 50,
+  ECHO_SEQUENCE_LENGTH: [3, 4], // min, max notes
+  ECHO_SEQUENCES_PER_ROUND: 4,
+  MELODY_HISTORY_SIZE: 4,
+
+  // Economy
+  COINS_PER_BLOCK: 1,
+  COINS_PER_ON_BEAT: 1,
+  COINS_PER_ECHO_BLOCK: 15,
+  MELODY_STAR_COIN_MULTIPLIER: 5,
+
+  // Colors
+  COLUMN_COLORS: ['#FF6B6B', '#FFA651', '#FFE66D', '#4ECDC4', '#45B7D1', '#A78BFA', '#F472B6'],
+  BG_TOP: '#1A0A2E',
+  BG_BOTTOM: '#2D1B69',
+  GROUND_COLOR: '#F5A623',
+  GROUND_PULSE_COLOR: '#FFD700',
+  GRID_LINE_COLOR: 'rgba(61,43,107,0.3)',
+  HUD_TEXT: '#F0F0F0',
+  SCORE_COLOR: '#FFD700',
+  MULTIPLIER_COLOR: '#00F5FF',
+  ON_BEAT_GLOW: 'rgba(255,255,255,0.4)',
+
+  // Animation
+  DROP_DURATION_MS: 200,
+  PLAYBACK_ROW_MS: 100,
+  STAR_COUNT: 30,
 };
 
 // ─── PROCEDURAL MUSIC CONSTANTS ───────────────────────────────────────────────

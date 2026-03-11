@@ -7,6 +7,7 @@ import BeatSandbox from './components/BeatSandbox.jsx';
 import Customizer from './components/Customizer.jsx';
 import ComingSoon from './components/ComingSoon.jsx';
 import CrystalMine from './components/CrystalMine.jsx';
+import EchoTowers from './components/EchoTowers.jsx';
 
 // Utilities
 import { resumeAudioCtx, startProceduralMusic } from './utils/audio.js';
@@ -86,6 +87,9 @@ export default function BlockVerse() {
   }
   if (screen === 'mining') {
     return <CrystalMine onBack={goToLobby} coins={coins} setCoins={setCoins} setXp={setXp} />;
+  }
+  if (screen === 'towers') {
+    return <EchoTowers onBack={goToLobby} coins={coins} setCoins={setCoins} setXp={setXp} />;
   }
 
   const currentGame = GAMES.find(g => g.id === screen);

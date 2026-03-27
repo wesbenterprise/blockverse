@@ -8,6 +8,7 @@ import Customizer from './components/Customizer.jsx';
 import ComingSoon from './components/ComingSoon.jsx';
 import CrystalMine from './components/CrystalMine.jsx';
 import EchoTowers from './components/EchoTowers.jsx';
+import StyleStage from './components/StyleStage.jsx';
 
 // Utilities
 import { resumeAudioCtx, startProceduralMusic } from './utils/audio.js';
@@ -90,6 +91,9 @@ export default function BlockVerse() {
   }
   if (screen === 'towers') {
     return <EchoTowers onBack={goToLobby} coins={coins} setCoins={setCoins} setXp={setXp} />;
+  }
+  if (screen === 'outfit') {
+    return <StyleStage onBack={goToLobby} coins={coins} setCoins={setCoins} setXp={setXp} avatar={avatar} />;
   }
 
   const currentGame = GAMES.find(g => g.id === screen);
